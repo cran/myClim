@@ -6,15 +6,15 @@
 \usage{
 mc_calc_tomst_dendro(
   data,
-  dendro_sensor = .model_const_SENSOR_DEND_TOMSTdendro,
-  output_sensor = .model_const_SENSOR_dendro_l_um,
+  dendro_sensor = mc_const_SENSOR_Dendro_raw,
+  output_sensor = mc_const_SENSOR_dendro_l_um,
   localities = NULL
 )
 }
 \arguments{
 \item{data}{cleaned myClim object see \link{myClim-package}}
 
-\item{dendro_sensor}{name of change in stem size sensor to be converted from raw to micrometers (default "DEND_TOMSTdendro") see \code{names(mc_data_sensors)}}
+\item{dendro_sensor}{name of change in stem size sensor to be converted from raw to micrometers (default "Dendro_raw") see \code{names(mc_data_sensors)}}
 
 \item{output_sensor}{name of new change in stem size sensor (default "dendro_l_um")}
 
@@ -24,10 +24,10 @@ mc_calc_tomst_dendro(
 myClim object same as input but with added dendro_l_um sensor
 }
 \description{
-This function creates new virtual sensor on locality within myClim data object.
+This function creates a new virtual sensor on locality within the myClim data object.
 The virtual sensor hosts the values of the change in stem size converted from raw
-Tomst units to micrometers. Note that newer versions of Tomst Lolly downloading
-software can converts raw Tomst units to micrometers.
+Tomst units to micrometers. Note that newer versions of Tomst Lolly
+software can directly convert raw Tomst units to micrometers.
 }
 \examples{
 agg_data <- mc_calc_tomst_dendro(mc_data_example_agg, localities="A1E05")

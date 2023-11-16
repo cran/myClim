@@ -9,49 +9,55 @@
 .prep_const_MESSAGE_SENSOR_METADATA_WRONG_SLOT <- "Sensor metadata doesn't cointain slot {param_name}."
 .prep_const_MESSAGE_UNIQUE_SENSOR_NAMES <- "Sensor names must be unique."
 .prep_const_MESSAGE_UNIQUE_LOCALITY_IDS <- "Locality_ids must be unique."
-.prep_const_MESSAGE_UNCLEANED_DATA<- "Data aren't cleaned."
+.prep_const_MESSAGE_UNCLEANED_DATA<- "Data is not cleaned."
 .prep_const_MESSAGE_NA_APPROX_METHOD_NOT_IMPLEMENTED <- "Method is not implemented."
 .prep_const_MESSAGE_CLEAN_AGG <- "It isn't possible to clean myClim object in Agg-format."
 .prep_const_MESSAGE_RECLEAN <- "MyClim object is already cleaned. Repeated cleaning overwrite cleaning informations."
+.prep_const_MESSAGE_ALREADY_CALIBRATED <- "It is not possible change calibration parameters in calibrated sensor."
+.prep_const_MESSAGE_DATETIME_WRONG_TYPE <- "Type of datetime column must be POSIXct."
+.prep_const_MESSAGE_CROP_DATETIME_LENGTH <- paste0("Start and end datetime can be NULL, ",
+                                                   "single value or vector with same length as localities.")
+.prep_const_MESSAGE_VALUES_SAME_TIME <- "In logger {serial_number} are different values of {sensor_name} in same time."
+.prep_const_MESSAGE_STEP_PROBLEM <- "step cannot be detected for logger {logger$metadata@serial_number} - skip"
 
 #' Cleaning datetime series
 #'
 #' @description
-#' By default `mc_prep_clean` runs automatically when [myClim::mc_read_files()], 
-#' [myClim::mc_read_data()] are called. `mc_prep_clean` check time-series in 
-#' myClim object in Raw-format for missing, duplicated, and disordered records 
-#' and regularize microclimatic time-series to constant time-step.
+#' By default `mc_prep_clean` runs automatically when [myClim::mc_read_files()],
+#' [myClim::mc_read_data()] are called. `mc_prep_clean` checks time-series in
+#' myClim object in Raw-format for missing, duplicated, and disordered records
+#' and regularizes microclimatic time-series to constant time-step.
 #' Duplicated records are removed and missing values are filled with NA.
 #'
 #' See details.
-#' 
+#'
 #' @details
-#' Processing the data with `mc_prep_clean` is a mandatory step 
+#' Processing the data with `mc_prep_clean` is a mandatory step
 #' required for further data handling in `myClim` library.
-#' 
-#' This function guarantee that all time series are in chronological order 
-#' and have regular time-step, without duplicated records.
-#' Function `mc_prep_clean` use time-step provided by user on import `mc_read`
-#' (is stored in metadata of logger [myClim::mc_LoggerMetadata]. 
-#' If time step is not provided by user on import (NA),than myClim automatically 
-#' identify the  time step from input time series based on last 100 records. 
-#' In case of irregular time series, function returns warning and skip series.
-#' 
-#' In case the time step is regular, but is not nicely rounded, function round 
-#' the time series to the closest nice time and shift original data. 
-#' E.g., original records in 10 min regular step c(11:58, 12:08, 12:18, 12:28) 
-#' are shifted to newly generated nice sequence c(12:00, 12:10, 12:20, 12:30)
-#' microclimatic records are not modified but only shifted. 
-#' Maximal allowed shift of time series is 30 minutes. I.e. when the time step 
-#' is 2h and goes like (13:33, 15:33, 17:33) then shifted to (13:30, 15:30, 17:30). 
-#' When you have 2h time step and wish to round to the whole hour 
-#' (13:33 -> 14:00, 15:33 -> 16:00) than after clening use  `mc_agg(period="2 hours")` 
-#' 
+#'
+#' This function guarantee that all time series are in chronological order,
+#' have regular time-step and no duplicated records.
+#' Function `mc_prep_clean` use time-step provided by user during data import with `mc_read`
+#' (used time-step is permanently stored in logger metadata [myClim::mc_LoggerMetadata].
+#' If time-step is not provided by the user (NA),than myClim automatically
+#' detects the time-step from input time series based on the last 100 records.
+#' In case of irregular time series, function returns warning and skip the series.
+#'
+#' In case the time-step is regular, but is not nicely rounded, function rounds
+#' the time series to the closest nice time and shifts original data.
+#' E.g., original records in 10 min regular step c(11:58, 12:08, 12:18, 12:28)
+#' are shifted to newly generated nice sequence c(12:00, 12:10, 12:20, 12:30).
+#' Note that microclimatic records are not modified but only shifted.
+#' Maximum allowed shift of time series is 30 minutes. For example, when the time-step
+#' is 2h (e.g. 13:33, 15:33, 17:33), the measurement times are shifted to (13:30, 15:30, 17:30).
+#' When you have 2h time step and wish to round to the whole hour
+#' (13:33 -> 14:00, 15:33 -> 16:00) than use `mc_agg(period="2 hours")` command after data cleaning.
+#'
 #' @template param_myClim_object_raw
 #' @param silent if true, then cleaning log table is not printed in console (default FALSE), see [myClim::mc_info_clean()]
-#' @return 
+#' @return
 #' * cleaned myClim object in Raw-format
-#' * cleaning log is by default printed in console, and can be called ex post by [myClim::mc_info_clean()]
+#' * cleaning log is by default printed in console, but can be called also later by [myClim::mc_info_clean()]
 #' @export
 #' @examples
 #' cleaned_data <- mc_prep_clean(mc_data_example_raw)
@@ -92,7 +98,7 @@ mc_prep_clean <- function(data, silent=FALSE) {
         logger$clean_info@step <- logger$metadata@step
     }
     if(is.na(logger$clean_info@step)) {
-        warning(stringr::str_glue("step cannot be detected for logger {logger$metadata@serial_number} - skip"))
+        warning(stringr::str_glue(.prep_const_MESSAGE_STEP_PROBLEM))
         return(logger)
     }
     new_datetime <- .prep_get_rounded_datetime(logger)
@@ -130,8 +136,12 @@ mc_prep_clean <- function(data, silent=FALSE) {
 .prep_clean_write_info <- function(logger, rounded) {
     diff_datetime <- diff(as.numeric(logger$datetime))
     logger$clean_info@count_disordered <- length(purrr::keep(diff_datetime, function(x) x < 0))
-    sorted_datetime <- sort(as.numeric(logger$datetime))
-    diff_datetime <- diff(sorted_datetime)
+    sorted_datetime <- as.numeric(logger$datetime)
+    if(logger$clean_info@count_disordered > 0)
+    {
+        sorted_datetime <- sort(sorted_datetime)
+        diff_datetime <- diff(sorted_datetime)
+    }
     logger$clean_info@count_duplicities <- length(purrr::keep(diff_datetime, function(x) x == 0))
     right_count_datetime <- diff(c(sorted_datetime[[1]], tail(sorted_datetime, n=1))) %/% logger$clean_info@step + 1
     logger$clean_info@count_missing <- right_count_datetime - (length(logger$datetime) - logger$clean_info@count_duplicities)
@@ -144,13 +154,23 @@ mc_prep_clean <- function(data, silent=FALSE) {
         return(logger)
     }
     table <- .common_sensor_values_as_tibble(logger)
-    table <- dplyr::arrange(table, .data$datetime)
-    unique_rows <- !duplicated(table$datetime)
-    table_noduplicits <- table[unique_rows, ]
-    datetime_range <- range(table_noduplicits$datetime)
+    datetime_range <- range(table$datetime)
     datetime_seq <- tibble::as_tibble(seq(datetime_range[[1]], datetime_range[[2]], by=stringr::str_glue("{logger$clean_info@step} sec")))
     colnames(datetime_seq) <- "datetime"
-    output_table <- dplyr::left_join(datetime_seq, table_noduplicits, by="datetime")
+    get_sorted_unique_values <- function(sensor_name) {
+        sensor_table <- table[c("datetime", sensor_name)]
+        sensor_table <- sensor_table[!is.na(sensor_table[sensor_name]),]
+        sensor_table <- dplyr::arrange(sensor_table, .data$datetime)
+        duplicated_datetime <- duplicated(sensor_table$datetime)
+        if(any(duplicated_datetime))
+        {
+            .prep_check_different_values_in_duplicated(sensor_table, logger$metadata@serial_number)
+            return(sensor_table[!duplicated_datetime, ])
+        }
+        return(sensor_table)
+    }
+    sensor_tables <- purrr::map(colnames(table)[-1], get_sorted_unique_values)
+    output_table <- purrr::reduce(c(list(datetime_seq), sensor_tables), ~ dplyr::left_join(.x, .y, by="datetime"))
     logger$datetime <- output_table$datetime
     sensor_names <- purrr::set_names(names(logger$sensors))
     logger$sensors <- purrr::map(sensor_names, function(x) {
@@ -158,6 +178,21 @@ mc_prep_clean <- function(data, silent=FALSE) {
         logger$sensors[[x]]
     })
     logger
+}
+
+.prep_check_different_values_in_duplicated <- function(sensor_table, serial_number){
+    duplicated_datetimes <- unique(sensor_table$datetime[duplicated(sensor_table$datetime)])
+    duplicated_rows <- dplyr::filter(sensor_table, .data$datetime %in% duplicated_datetimes)
+    groupped_duplicated <- dplyr::group_by(duplicated_rows, .data$datetime)
+    is_different_function <- function(.x, .y) {
+        result <- !all(diff(.x[[1]]) == 0)
+        return(result)
+    }
+    is_different <- as.logical(dplyr::group_map(groupped_duplicated, is_different_function))
+    if(any(is_different)) {
+        sensor_name <- names(sensor_table)[[2]]
+        warning(stringr::str_glue(.prep_const_MESSAGE_VALUES_SAME_TIME))
+    }
 }
 
 .prep_is_logger_cleaned <- function(logger) {
@@ -212,32 +247,30 @@ mc_prep_clean <- function(data, silent=FALSE) {
 }
 
 #' Set metadata of localities
-#' 
+#'
 #' @description
-#' This function allows you to add or modify locality metadata including 
+#' This function allows you to add or modify locality metadata including
 #' locality names. See [mc_LocalityMetadata].
-#' You can import metadata from named list or from data frame. See details. 
-#'  
+#' You can import metadata from named list or from data frame. See details.
+#'
 #' @details
-#' Locality metadata is especially useful for handling time zones, considering temporal cycling.
-#' E.g. while providing coordinates, and in case you are sure, the loggers recorded in UTC, 
-#' you can harmonize all data to the solar time (midday) with [myClim::mc_prep_solar_tz()] 
-#' calculating offset to the UTC based on coordinates. Or you can directly provide 
-#' the offset in minutes yourself for individual localities. This is useful e.g. 
-#' for heterogeneous data sets containing loggers recording in local time
-#' and you wish to unify them by setting individual offset e.g. back to UTC. 
-#' If tz_offset is set manually, than tz_type is set to `user defined`.  
-#' 
+#' Locality metadata is critical e.g. for correctly handling time zones.
+#' By providing geographic coordinates in locality metadata, the user can later harmonize all data to the local solar time (midday) #' with [myClim::mc_prep_solar_tz()] or calculate temporal offset to the UTC base on local time-zone. 
+#' Alternatively, the user can directly provide the offset (in minutes) for individual localities. This can be useful especially
+#' for heterogeneous data sets containing various localities with loggers recording in local time. By providing temporal offset for #' each locality separately, you can unify the whole dataset to UTC.
+#' Note that when tz_offset is set manually, than tz_type is set to `user defined`.
+#'
 #' For minor metadata modification it is practical to use named list in combination
-#' with `param_name` specification. E.g. when you wish to modify only time zone offset,  
-#' then set `param_name="tz_offset"` and provide named list with locality name and 
-#' offset value `list(A1E05=60)`. Similarly for other metadata slots [mc_LocalityMetadata].
-#' 
+#' with `param_name` specification. E.g. when you wish to modify only time zone offset,
+#' then set `param_name="tz_offset"` and provide named list with locality name and
+#' offset value `list(A1E05=60)`. 
+#' Similarly, you can modify other metadata slots [mc_LocalityMetadata].
+#'
 #' For batch or generally more complex metadata modification you can provide data.frame
 #' with columns specifying `locality_id` and one of `new_locality_id, elevation, lat_wgs84, lon_wgs84, tz_offset`.
-#' Provide locality_id (name) and the value in column of metadata you wish to update. 
-#' In case of using data.frame use `param_name = NULL`  
-#' 
+#' Provide locality_id (name) and the value in column of metadata you wish to update.
+#' In case of using data.frame use `param_name = NULL`
+#'
 #' @template param_myClim_object
 #' @param values for localities can be named list or table
 #'
@@ -315,13 +348,13 @@ mc_prep_meta_locality <- function(data, values, param_name=NULL) {
 #' This function allows you to modify sensor metadata including sensor name. See [mc_SensorMetadata]
 #'
 #' @template param_myClim_object
-#' @param values named list with metadata values; names of items are sensor_names e.g. 
+#' @param values named list with metadata values; names of items are sensor_names e.g.
 #' for changing sensor height use `list(TMS_T1="soil 8 cm")`
-#' @param param_name name of the sensor metadata parameter you want to change; 
+#' @param param_name name of the sensor metadata parameter you want to change;
 #' You can change `name` and `height` of sensor.
-#' @param localities optional filter; vector of `locality_id` 
+#' @param localities optional filter; vector of `locality_id`
 #' where to change sensor metadata; if NULL than all localities (default NULL)
-#' @param logger_types optional filter; vector of `logger_type` 
+#' @param logger_types optional filter; vector of `logger_type`
 #' where to change metadata; if NULL than all logger types (default NULL);
 #' `logger_type`is useful only for Raw-format of myClim having the level of logger see [myClim-package]
 #' @return myClim object in the same format as input, with updated sensor metadata
@@ -386,16 +419,16 @@ mc_prep_meta_sensor <- function(data, values, param_name, localities=NULL, logge
 }
 
 #' Set solar time offset against UTC time
-#' 
+#'
 #' @description
 #' This function calculates the offset against UTC on the locality to get the solar time.
 #' This is based on coordinates (longitude). If longitude is not provided, then not working.
-#'  
+#'
 #' @details
-#' myClim library presumes the data in UTC by default. This function require at least longitude provided in locality
-#' metadata slot `lon_wgs84`. If longitude is not provided, function does not work. Coordinates of locality can be provided
-#' e.g. during data reading see [myClim::mc_read_data()] or ex post with [myClim::mc_prep_meta_locality()] function.
-#' 
+#' myClim library presumes the data in UTC by default. This function requires longitude to be provided in locality
+#' metadata slot `lon_wgs84` (in decimal degrees). Coordinates of locality can be provided
+#' during data reading, see [myClim::mc_read_data()], or ex post with [myClim::mc_prep_meta_locality()] function.
+#'
 #' TZ offset in minutes is calculated as `longitude / 180 * 12 * 60`.
 #'
 #' @template param_myClim_object
@@ -436,50 +469,97 @@ mc_prep_solar_tz <- function(data) {
 #' This function crop data by datetime
 #'
 #' @details
-#' Function is able to crop data from start to end but works also 
-#' with only start and only end. When only start provided, then crop only start and
-#' do not touch the end and vice versa.   
+#' Function is able to crop data from `start` to `end` but works also
+#' with `start` only and `end` only. When only `start` is provided, then function crops only
+#' the beginning of the tim-series and vice versa with end.
+#'
+#' If `start` or `end` is a single POSIXct value, it is used for all or selected localities (regular crop).
+#' However, if `start` and `end` are vectors of POSIXct values with the same length as the localities vector,
+#' each locality is cropped by its own time window (irregular crop).
+#'
+#' The `end_included` parameter is used for selecting, whether to return data which contains `end`
+#' time or not. For example when cropping the data to rounded days, typically users use midnight.
+#' 2023-06-15 00:00:00 UTC. But midnight is the last date of ending day and the same
+#' time first date of the next day. Thus, there will be the last day with single record.
+#' This can be confusing in aggregation (e.g. daily mean of single record per day, typically NA) so
+#' sometimes it is better to exclude end and crop on 2023-06-14 23:45:00 UTC (15 minutes records).
 #'
 #' @template param_myClim_object
-#' @param start POSIXct datetime in UTC; is optional; start datetime is included
-#' @param end POSIXct datetime in UTC; is optional
-#' @param end_included if TRUE then end datetime is included (default TRUE)
-#' @return cropped data in the same myClim format as input. 
+#' @param start optional; POSIXct datetime **in UTC**; single value or vector; start datetime is included (default NULL)
+#' @param end optional, POSIXct datetime **in UTC**; single value or vector (default NULL)
+#' @param localities vector of locality_ids to be cropped; if NULL then all localities are cropped (default NULL)
+#' @param end_included if TRUE then end datetime is included (default TRUE), see details
+#' @return cropped data in the same myClim format as input.
 #' @export
 #' @examples
 #' cropped_data <- mc_prep_crop(mc_data_example_clean, end=as.POSIXct("2020-02-01", tz="UTC"))
-mc_prep_crop <- function(data, start=NULL, end=NULL, end_included=TRUE) {
-    if(!is.null(start) && format(start, format="%Z") != "UTC") {
+mc_prep_crop <- function(data, start=NULL, end=NULL, localities=NULL, end_included=TRUE) {
+    if(!is.null(start) && any(format(start, format="%Z") != "UTC")) {
         warning(stringr::str_glue("start datetime is not in UTC"))
     }
-    if(!is.null(end) && format(end, format="%Z") != "UTC") {
+    if(!is.null(end) && any(format(end, format="%Z") != "UTC")) {
         warning(stringr::str_glue("end datetime is not in UTC"))
     }
-
-    sensors_item_function <- function(item) {
-        .prep_crop_data(item, start, end, end_included)
+    if(!.prep_crop_is_datetime_correct(start, localities) ||
+        !.prep_crop_is_datetime_correct(end, localities)) {
+        stop(.prep_const_MESSAGE_CROP_DATETIME_LENGTH)
+    }
+    all_table <- tibble::tibble(locality_id=names(data$localities))
+    if(!is.null(localities)) {
+        table <- tibble::tibble(locality_id=localities)
+        table$start_datetime <- if(is.null(start)) lubridate::NA_POSIXct_ else start
+        table$end_datetime <- if(is.null(end)) lubridate::NA_POSIXct_ else end
+        all_table <- dplyr::left_join(all_table, table, by="locality_id")
+    }
+    else {
+        all_table$start_datetime <- if(is.null(start)) lubridate::NA_POSIXct_ else start
+        all_table$end_datetime <- if(is.null(end)) lubridate::NA_POSIXct_ else end
     }
 
-    raw_locality_function <- function(locality) {
-        locality$loggers <- purrr::map(locality$loggers, sensors_item_function)
-        locality
+    sensors_item_function <- function(item, start_datetime, end_datetime) {
+        .prep_crop_data(item, start_datetime, end_datetime, end_included)
+    }
+
+    raw_locality_function <- function(locality_id, start_datetime, end_datetime) {
+        locality <- data$localities[[locality_id]]
+        if(!is.na(start_datetime) || !is.na(end_datetime)) {
+            locality$loggers <- purrr::pmap(list(item=locality$loggers,
+                                                 start_datetime=start_datetime,
+                                                 end_datetime=end_datetime),
+                                            sensors_item_function)
+        }
+        return(locality)
+    }
+
+    agg_locality_function <- function(locality_id, start_datetime, end_datetime) {
+        locality <- data$localities[[locality_id]]
+        if(!is.na(start_datetime) || !is.na(end_datetime)) {
+            locality <- sensors_item_function(locality, start_datetime, end_datetime)
+        }
+        return(locality)
     }
 
     if(.common_is_agg_format(data)) {
-        data$localities <- purrr::map(data$localities, sensors_item_function)
+        data$localities <- purrr::pmap(all_table, agg_locality_function)
     } else {
-        data$localities <- purrr::map(data$localities, raw_locality_function)
+        data$localities <- purrr::pmap(all_table, raw_locality_function)
     }
+    names(data$localities) <- all_table$locality_id
     return(data)
+}
+
+.prep_crop_is_datetime_correct <- function(datetime, localities) {
+    return(is.null(datetime) || length(datetime) == 1 ||
+        (!is.null(localities) && length(datetime) == length(localities)))
 }
 
 .prep_crop_data <- function(item, start, end, end_included) {
     table <- .common_sensor_values_as_tibble(item)
-    if(!is.null(start)) {
+    if(!is.na(start)) {
         table <- dplyr::filter(table, .data$datetime >= start)
     }
-    last_datetime <- NULL
-    if(!is.null(end)) {
+    last_datetime <- lubridate::NA_POSIXct_
+    if(!is.na(end)) {
         table <- dplyr::filter(table, .data$datetime < end | (end_included & .data$datetime == end))
         last_datetime <- end
         if(length(table$datetime) > 0) {
@@ -505,10 +585,10 @@ mc_prep_crop <- function(data, start=NULL, end=NULL, end_included=TRUE) {
         return(item)
     }
 
-    if(is.null(start)) {
+    if(is.na(start)) {
         start <- min(item$datetime)
     }
-    if(is.null(end)) {
+    if(is.na(end)) {
         end <- max(item$datetime)
     }
     interval <- lubridate::interval(start, end)
@@ -526,18 +606,18 @@ mc_prep_crop <- function(data, start=NULL, end=NULL, end_included=TRUE) {
 #'
 #' @description
 #' This function is designed to merge more existing myClim objects into one.
-#' 
+#'
 #' @details
-#' This function works only when the input myClim objects have the same format 
-#' (Raw-format, Agg-format) It is not possible to merge Raw wit Agg format. 
+#' This function works only when the input myClim objects have the same format
+#' (Raw-format, Agg-format) It is not possible to merge Raw wit Agg format.
 #' Identical time-step is required for Agg-format data.
-#' 
+#'
 #' When the merged myClim objects in Raw-format contains locality with same names (locality_id),
-#' than list of loggers are merged on the locality. Sensors with the same name does not matter here. 
+#' than list of loggers are merged on the locality. Sensors with the same name does not matter here.
 #' Loggers with the same name within the locality are allowed in the Raw-format.
-#' 
+#'
 #' When the merged myClim objects in Agg-format contains locality with same names (locality_id).
-#' than the sensors are merged on the locality. Sensors with same names are renamed. 
+#' than the sensors are merged on the locality. Sensors with same names are renamed.
 #'
 #' @param data_items list of myClim objects see [myClim-package]; Format (Raw/Agg) of merged objects must be same.
 #' @return merged myClim object in the same format as input objects
@@ -600,46 +680,47 @@ mc_prep_merge <- function(data_items) {
     locality1
 }
 
-#' Load calibration to correct microclimatic records
+#' Load sensor calibration parameters to correct microclimatic records
 #'
 #' @description
-#' This function loads calibration parameters from data.frame 
-#' and writes them into myClim object metadata. This function
+#' This function loads calibration parameters from data.frame *logger_calib_table*
+#' and stores them in the myClim object metadata. This function
 #' does not calibrate data. For calibration itself run [myClim::mc_prep_calib()]
 #'
 #' @details
-#' This function allows user to provide calibration values either from DIY or 
-#' certified calibration procedure. Calibration data have by default the form 
-#' of linear function determined by the `cor_factor` and `cor_slope`:
-#' 
-#' `calibrated = original * (cor_slope + 1) + cor_factor` 
-#' 
-#' This is useful in 
-#' case of multi-point calibration typically performed by certified calibration 
-#' labs. In case of one-point calibration typically DIY 
-#' calibrations only `cor_factor` is used and `cor_slope=0`. One point calibration
-#' is thus only the addition of correction factor. This function loads sensor specific 
-#' calibration values from data frame and writs them into myClim Raw-format 
-#' object metadata. The structure of input data frame is as follows:
+#' This function allows user to provide correction coefficients `cor_factor` and `cor_slope` for linear sensor calibration.
+#' Calibrated data have by default the form of linear function terms:
 #'
-#'  * serial_number = unique identification of logger hosting the sensors e.g. 91184101 
-#'  * sensor_id = the name of sensor to calibrate e.g. TMS_T1
-#'  * datetime = the date of the calibration
-#'  * cor_factor = the correction factor, in case of multi-point calibration the intercept of calibration curve.
-#'  * cor_slope = the slope of calibration curve (in case of one-point calibration slope = 0)
+#' `calibrated value = original value * (cor_slope + 1) + cor_factor`
 #'
-#' It is not possible to change calibration parameters for already calibrated sensor. 
-#' This prevents repeated calibrations. Once [myClim::mc_prep_calib()] is called then 
-#' it is not allowed to provide new calibration data, neither run calibration again. 
+#' In case of one-point calibration, `cor_factor` can be estimated as:
+#' `cor_factor = reference value - sensor value`
+#' and `cor_slope` should be set to 0.
+#' This function loads sensor-specific
+#' calibration coefficients from *calib_table* and stores them into myClim Raw-format
+#' object metadata. The *calib_table* is data.frame with 5 columns:
+#'
+#'  * serial_number = serial number of the logger
+#'  * sensor_id = name of sensor, e.g. "TMS_T1"
+#'  * datetime = the date of the calibration in POSIXct type
+#'  * cor_factor = the correction factor
+#'  * cor_slope = the slope of calibration curve (in case of one-point calibration, use cor_slope = 0)
+#'
+#' It is not possible to change calibration parameters for already calibrated sensor.
+#' This prevents repeated calibrations. Once [myClim::mc_prep_calib()] is called then
+#' it is not allowed to provide new calibration data, neither run calibration again.
 #'
 #' @template param_myClim_object_raw
 #' @param calib_table data.frame with columns (serial_number, sensor_id, datetime, slope, intercept)
-#' @return myClim object with loaded calibration information in metadata. 
-#' Microclimatic records are not calibrated, only ready for calibration. 
+#' @return myClim object with loaded calibration information in metadata.
+#' Microclimatic records are not calibrated, only ready for calibration.
 #' To calibrate records run [myClim::mc_prep_calib()]
 #' @export
 mc_prep_calib_load <- function(data, calib_table) {
     .common_stop_if_not_raw_format(data)
+    if(!lubridate::is.POSIXct(calib_table$datetime)) {
+        stop(.prep_const_MESSAGE_DATETIME_WRONG_TYPE)
+    }
     calib_table <- dplyr::group_nest(dplyr::group_by(calib_table, .data$serial_number))
 
     sensor_function <- function(sensor, logger_calib_table) {
@@ -648,7 +729,7 @@ mc_prep_calib_load <- function(data, calib_table) {
             return(sensor)
         }
         if(sensor$metadata@calibrated) {
-            stop("It is not possible change calibration parameters in calibrated sensor.")
+            stop(.prep_const_MESSAGE_ALREADY_CALIBRATED)
         }
         if(!("cor_slope" %in% colnames(sensor_calib_table))) {
             sensor_calib_table$cor_slope <- 0
@@ -680,24 +761,24 @@ mc_prep_calib_load <- function(data, calib_table) {
 #' Sensors calibration
 #'
 #' @description
-#' This function calibrate values of sensor (microclimatic records) using the 
-#' myClim object `sensor$calibration` parameters provided by [myClim::mc_prep_calib_load()]. 
-#' Microclimatic records are changed and myClim object parameter `sensor$metadata@calibrated` 
+#' This function calibrate values of sensor (microclimatic records) using the
+#' myClim object `sensor$calibration` parameters provided by [myClim::mc_prep_calib_load()].
+#' Microclimatic records are changed and myClim object parameter `sensor$metadata@calibrated`
 #' is set to TRUE. It isn't allowed to calibrate sensor multiple times.
 #'
 #' @details
 #' This function performs calibration itself. It uses the calibration values (cor_factor, cor_slope) stored
-#' in myClim object sensor metadata sensor calibration loaded with [myClim::mc_prep_calib_load()]. 
+#' in myClim object sensor metadata sensor calibration loaded with [myClim::mc_prep_calib_load()].
 #' As it is possible to have multiple calibration values for one sensor in time (re-calibration after some time)
-#' different calibration values can be applied based on the calibration time. Older microclimatic records 
+#' different calibration values can be applied based on the calibration time. Older microclimatic records
 #' then first calibration `datetime` available are calibrated anyway (in case sensor was calibrated ex-post)
 #' with the first calibration parameters available.
-#' 
-#' This function is not designed for TMSmoisture calibration 
+#'
+#' This function is not designed for moisture_raw calibration
 #' (conversion to volumetric water content) for this use [myClim::mc_calc_vwc()]
-#' 
+#'
 #' Only sensors with real value type can be calibrated. see [myClim::mc_data_sensors()]
-#' 
+#'
 #' @param data myClim object in Raw-format or Agg-format having calibration data in metadata slot `sensor$calibration`
 #' @param localities vector of locality_ids where to perform calibration, if NULL, then calibrate sensors on all localities (default NULL)
 #' @param sensors vector of sensor names where to perform calibration see `names(mc_data_sensors)`; if NULL,
@@ -721,7 +802,7 @@ mc_prep_calib <- function(data, localities=NULL, sensors=NULL) {
             warning(stringr::str_glue("Calibration parameters are missing in sensor {sensor$metadata@name} in {locality_id}."))
             return(sensor)
         }
-        if(.model_is_physical_TMSmoisture(sensor$metadata)) {
+        if(.model_is_physical_moisture_raw(sensor$metadata)) {
             warning(stringr::str_glue("Using simple linear correction of raw moisture values in sensor {sensor$metadata@name}, for more precisse correction use function mc_calc_vwc."))
         }
         if(sensor$metadata@calibrated) {
@@ -785,15 +866,16 @@ mc_prep_calib <- function(data, localities=NULL, sensors=NULL) {
 }
 
 #' Fill NA
-#' 
+#'
 #' @description
-#' This function approximate NA (missing) values. It was designed to fill 
-#' only small gaps in microclimatic time-series therefore, the default maximum 
+#' This function approximate NA (missing) values. It was designed to fill
+#' only small gaps in microclimatic time-series therefore, the default maximum
 #' length of the gap is 5 missing records and longer gaps are not filled
 #' Only linear method is implemented from [zoo::na.approx] function.
 #'
-#' @template param_myClim_object
-#' @template param_localities_sensors
+#' @template param_myClim_object_cleaned
+#' @template param_localities
+#' @template param_sensors
 #' @param maxgap maximum number of consecutively NA values to fill (default 5)
 #' @param method used for approximation. It is implemented now only "linear". (default "linear")
 #' @return myClim object with filled NA values
@@ -835,4 +917,163 @@ mc_prep_fillNA <- function(data, localities=NULL, sensors=NULL, maxgap=5, method
 
     data$localities <- purrr::map(data$localities, locality_function)
     return(data)
+}
+
+#' Detection of out-of-soil measurements from TMS logger
+#'
+#' @description
+#' This function creates new virtual sensor labelling anomalies in TMS logger caused by displacement out of from soil.
+#'
+#' @details
+#' TMS loggers, when correctly installed in the soil, exhibit certain temperature and soil moisture signal characteristics.
+#' Temperature varies the most at the soil interface, and temperature fluctuations in the soil are minimized.
+#' The moisture signal from a sensor that has lost direct contact with the soil is reduced.
+#' The following criteria are used for detecting faulty measurements: the ratio of the standard deviations of the soil
+#' sensor to the above-ground sensor within 24h moving window is greater than the defined threshold (default 0.76085),
+#' and simultaneously, the soil moisture minimum within 24h mowing window is less than 721.5.
+#' Optionally, the prediction results can be smoothed using a floating window to average-out unlikely short periods detected by the algorithm.
+#' Selection and parametrization of criteria was done using a recursive partitioning (rpart::rpart)
+#' on the training set of 7.8M readings in 154 TMS timeseries from different environmental settings (temperate forests, tropical rainforest, cold desert, alpine and subnival zone,
+#' and invalid measurements from loggers stored in the office or displaced from the soil).
+#' Sensitivity of the method (true positive rate) on was 95.1% and specificity (true negative rate) was 99.4% using function default parameters.
+#' Smoothing with 10 day floating window increased sensitivity to 96.8% while retaining specifity at the same level of 99.4%.
+#' Decreasing 'smooth_threshold' below 0.5 will extend periods flagged as faulty measurement.
+#'
+#' @template param_myClim_object_cleaned
+#' @template param_localities
+#' @param soil_sensor character, soil temperature sensor (default `mc_const_SENSOR_TMS_T1`)
+#' @param air_sensor character, air temperature sensor (default `mc_const_SENSOR_TMS_T2`)
+#' @param moist_sensor character, soil moisture sensor (default `mc_const_SENSOR_TMS_moist`)
+#' @param output_sensor character, name of virtual sensor to store ouptup values (default "off_soil")
+#' @param smooth logical, smooth out isolated faulty/correct records using floating window (default FALSE)
+#' @param smooth_window integer, smooth floating window width (in days) (default 10)
+#' @param smooth_threshold numeric, floating window threshold for detection of faulty records. (default 0.5)
+#' @param sd_threshold numeric, threshold value for the criteria on the ratio of standard deviation of the soil sensor
+#' to the above-ground sensor temperatures (default 0.76085)
+#' @param minmoist_threshold numeric, threshold value for criteria on the minimum soil moisture (default 721.5)
+#' @return numeric vector (0 = correct measurement, 1 = faulty measurement) stored as virtual sensor in myClim object
+#' @export
+#' @examples
+#' data <- mc_read_files(system.file("extdata", "data_93142760_201904.csv", package = "myClim"),
+#'                       "TOMST")
+#' data <- mc_prep_TMSoffsoil(data)
+#' mc_plot_line(data, sensors = c("off_soil","TMS_T1", "TMS_T2","TMS_T3"))
+mc_prep_TMSoffsoil <- function(data,
+                               localities=NULL,
+                               soil_sensor = mc_const_SENSOR_TMS_T1,
+                               air_sensor = mc_const_SENSOR_TMS_T2,
+                               moist_sensor = mc_const_SENSOR_TMS_moist,
+                               output_sensor = "off_soil",
+                               smooth = FALSE,
+                               smooth_window = 10,
+                               smooth_threshold = 0.5,
+                               sd_threshold = 0.76085,
+                               minmoist_threshold = 721.5){
+    is_agg <- .common_is_agg_format(data)
+    if(!is_agg) {
+        .prep_check_datetime_step_unprocessed(data, stop)
+    } else {
+        .calc_check_maximal_day_step(data)
+    }
+
+    logger_function <- function (logger) {
+        if(.calc_check_maximal_day_step_in_logger_get_skip(logger))
+        {
+            return(logger)
+        }
+        .prep_item_add_tmsoffsoil_sensor(logger, logger$clean_info@step, soil_sensor, air_sensor, moist_sensor,
+                                         output_sensor, smooth, smooth_window, smooth_threshold, sd_threshold,
+                                         minmoist_threshold)
+    }
+
+    locality_function <- function (locality) {
+        if(!(is.null(localities) || locality$metadata@locality_id %in% localities)) {
+            return(locality)
+        }
+        if(is_agg) {
+            return(.prep_item_add_tmsoffsoil_sensor(locality, data$metadata@step, soil_sensor, air_sensor, moist_sensor,
+                                                    output_sensor, smooth, smooth_window, smooth_threshold,
+                                                    sd_threshold, minmoist_threshold))
+        }
+
+        locality$loggers <- purrr::map(locality$loggers, logger_function)
+        return(locality)
+    }
+
+    data$localities <- purrr::map(data$localities, locality_function)
+    return(data)
+}
+
+.prep_item_add_tmsoffsoil_sensor <- function(item, step, soil_sensor, air_sensor, moist_sensor, output_sensor,
+                                             smooth, smooth_window, smooth_threshold, sd_threshold, minmoist_threshold){
+    skip <- .prep_TMSofsoil_check_sensors_get_skip(item, soil_sensor, air_sensor, moist_sensor, output_sensor)
+    if(skip) {
+        return(item)
+    }
+    count_values_per_day <- 3600 * 24 / step
+    t1_sd <- .prep_apply_function_to_window(item$sensors[[soil_sensor]]$values, count_values_per_day + 1, sd, fillNA = TRUE)
+    t2_sd <- .prep_apply_function_to_window(item$sensors[[air_sensor]]$values, count_values_per_day + 1, sd, fillNA = TRUE)
+    sdt12 <- t1_sd / t2_sd
+    moist <- item$sensors[[moist_sensor]]$values
+    minmoist  <- .prep_apply_function_to_window(moist, count_values_per_day + 1, min, na.rm = TRUE)
+    result_values <- ifelse(sdt12 < sd_threshold, 0, ifelse(minmoist >= minmoist_threshold, 0, 1))
+    if(smooth) {
+        result_values <- .prep_smoothing_rolling_mean(result_values, smooth_window * count_values_per_day + 1,
+                                                      threshold = smooth_threshold, na.rm = TRUE)
+    }
+    item$sensors[[output_sensor]] <- .common_get_new_sensor(mc_const_SENSOR_logical, output_sensor,
+                                                            values=result_values)
+    return(item)
+}
+
+# Fast rolling window
+#
+# @details Aplly custom function to rolling window.
+#
+# @param values numeric vector
+# @param window_width integer, rolling window width
+# @param FUN custom function to be applied in rolling windows
+# @param na.rm na.rm argument passed to custom function
+# @param fillNA logical, fill_na = TRUE fills vector edges with NA, fill_na fills vector edges with first/last value
+.prep_apply_function_to_window <- function(values, window_width, FUN, na.rm = TRUE, fillNA = FALSE){
+    begin <- rep(ifelse(fillNA, NA, dplyr::first(values)), window_width)
+    end <- rep(ifelse(fillNA, NA, dplyr::last(values)), window_width )
+    frollapply_values <- c(begin, values,  end)
+    result <- data.table::frollapply(frollapply_values, n=window_width, FUN=FUN, na.rm=na.rm, align="center", fill=NA)
+    return(as.numeric(result[(window_width + 1):(length(values) + window_width)]))
+}
+
+# Smoothing 0/1 timeseries using fast rolling mean
+#
+# @param values numeric vector
+# @param window_width integer, rolling window width
+# @param threshold integer, threshold for classification of smoothed values back to 0/1
+# @param na.rm logical
+.prep_smoothing_rolling_mean <- function(values, window_width, threshold=0.5, na.rm=TRUE){
+    frollmean_values <- c(rep(dplyr::first(values), window_width), values, rep(dplyr::last(values), window_width))
+    result <- data.table::frollmean(frollmean_values, n =  window_width, align = "center", fill = NA, na.rm = na.rm)
+    return(as.numeric(result[(window_width+1):(length(values)+window_width)] >= threshold))
+}
+
+.prep_TMSofsoil_check_sensors_get_skip <- function(item, soil_sensor, air_sensor, moist_sensor, output_sensor){
+    if(!.calc_check_sensor_in_item(item, soil_sensor)){
+        return(TRUE)
+    }
+    if(!.model_is_physical_T_C(item$sensors[[soil_sensor]]$metadata)){
+        .calc_wrong_physical_error_function(soil_sensor, .model_const_PHYSICAL_T_C)
+    }
+    if(!.calc_check_sensor_in_item(item, air_sensor)){
+        return(TRUE)
+    }
+    if(!.model_is_physical_T_C(item$sensors[[air_sensor]]$metadata)){
+        .calc_wrong_physical_error_function(air_sensor, .model_const_PHYSICAL_T_C)
+    }
+    if(!.calc_check_sensor_in_item(item, moist_sensor)){
+        return(TRUE)
+    }
+    if(!.model_is_physical(item$sensors[[moist_sensor]]$metadata, .model_const_PHYSICAL_moisture_raw)){
+        .calc_wrong_physical_error_function(moist_sensor, .model_const_PHYSICAL_moisture_raw)
+    }
+    .calc_warn_if_overwriting(item, output_sensor)
+    return(FALSE)
 }

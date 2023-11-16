@@ -2,8 +2,8 @@
 #  
 #  # === First install dependencies ===
 #  requiered_packages <- c("stringr", "lubridate", "tibble", "dplyr", "purrr",
-#                          "ggplot2", "ggforce", "viridis", "runner", "rmarkdown",
-#                          "knitr", "kableExtra", "tidyr", "plotly")
+#                          "ggplot2", "ggforce", "viridis", "data.table", "rmarkdown",
+#                          "knitr", "kableExtra", "tidyr", "plotly", "zoo", "vroom")
 #  missing_packages <- requiered_packages[!(requiered_packages %in% installed.packages()[,"Package"])]
 #  if(length(missing_packages)) install.packages(missing_packages)
 #  
@@ -13,7 +13,7 @@
 
 ## ----eval=TRUE,warning=FALSE--------------------------------------------------
 library(myClim)
-## Read without metadata
+## Read pre-defined loggers without metadata
 # read from Tomst files
 tms.f <- mc_read_files(c("data_91184101_0.csv", "data_94184102_0.csv",
                          "data_94184103_0.csv"),
@@ -33,7 +33,7 @@ meteo.table <- readRDS("airTmax_meteo.rds") # wide format data frame
 meteo <- mc_read_wide(meteo.table, sensor_id = "T_C", 
                       sensor_name = "airTmax", silent = T)
 
-## Read with metadata
+## Read pre-defined logger with metadata
 # provide two tables. Can be csv files or R data.frame
 ft <- read.table("files_table.csv", sep=",", header = T)
 lt <- read.table("localities_table.csv", sep=",", header = T)
@@ -77,7 +77,7 @@ tms <- mc_prep_calib(tms.load, sensors = c("TM_T",
                                            "TMS_T2",
                                            "TMS_T3"))
 
-## ---- eval=FALSE,error=FALSE,warning=FALSE------------------------------------
+## ----eval=FALSE,error=FALSE,warning=FALSE-------------------------------------
 #  mc_info_count(tms)
 #  mc_info_clean(tms)
 #  mc_info(tms)
@@ -160,7 +160,7 @@ tms.usertz <- mc_prep_meta_locality(tms,
 #  ## lines
 #  tms.plot <- mc_filter(tms, localities = "A6W79")
 #  
-#  p <- mc_plot_line(tms.plot, sensors = c("TMS_T3", "TMS_T1", "TMS_TMSmoisture"))
+#  p <- mc_plot_line(tms.plot, sensors = c("TMS_T3", "TMS_T1", "TMS_moist"))
 #  p <- p+ggplot2::scale_x_datetime(date_breaks = "1 week", date_labels = "%W")
 #  p <- p+ggplot2::xlab("week")
 #  p <- p+ggplot2::aes(size = sensor_name)
@@ -213,13 +213,13 @@ moist_env <- mc_env_moist(tms.calc, period = "all", min_coverage = 0.9)
 vpd_env   <- mc_env_vpd(hobo.vpd, period = "all", min_coverage = 0.9)
 
 
-## ---- eval=TRUE---------------------------------------------------------------
+## ----eval=TRUE----------------------------------------------------------------
 
 ## wide table of air temperature and soil moisture
-tms.wide <- mc_reshape_wide(tms.calc, sensors = c("TMS_T3", "vwc_moisture"))
+tms.wide <- mc_reshape_wide(tms.calc, sensors = c("TMS_T3", "vwc"))
 
 ## long table of air temperature and soil moisture
-tms.long <- mc_reshape_long(tms.calc, sensors = c("TMS_T3", "vwc_moisture"))
+tms.long <- mc_reshape_long(tms.calc, sensors = c("TMS_T3", "vwc"))
 
 tms.long.all <- mc_reshape_long(tms.all)
 

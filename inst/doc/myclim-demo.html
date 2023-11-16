@@ -567,11 +567,15 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 
 <div id="reading-microclimatic-data" class="section level2">
 <h2>Reading Microclimatic Data</h2>
-<p>myClim natively supports the import of several file formats, which
-can be viewed by running the command TOMST_join, TOMST, HOBO in R. To
-specify the data format when reading in files, set the dataformat_name
-parameter. Alternatively, myClim can read in records from any wide or
-long data frame in R.</p>
+<p>myClim natively supports the import of several pre-defined loggers.
+You can view the list of pre-defined loggers using
+<code>names(myClim::mc_data_formats)</code>. To specify the data format
+when reading files, set the <code>dataformat_name</code> parameter.
+There is also the possibility to read user-defined loggers by defining
+the <code>user_data_formats</code> parameter. For examples of how to
+read custom loggers in myClim, please refer to a separate vignette.
+Alternatively, myClim can read records from any wide or long data frame
+in R.</p>
 <p><strong>The mc_read_files(), mc_read_wide(), and
 mc_read_long()</strong> functions can be used for reading in data
 without metadata. These functions are user-friendly, fast, and allow for
@@ -583,7 +587,7 @@ table that specifies logger file paths, data format name, logger type,
 and locality. 2. A table that provides locality metadata, such as
 coordinates, elevation, time offset to UTC, and so on.</p>
 <div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(myClim)</span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="do">## Read without metadata</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="do">## Read pre-defined loggers without metadata</span></span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="co"># read from Tomst files</span></span>
 <span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>tms.f <span class="ot">&lt;-</span> <span class="fu">mc_read_files</span>(<span class="fu">c</span>(<span class="st">&quot;data_91184101_0.csv&quot;</span>, <span class="st">&quot;data_94184102_0.csv&quot;</span>,</span>
 <span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>                         <span class="st">&quot;data_94184103_0.csv&quot;</span>),</span>
@@ -603,7 +607,7 @@ coordinates, elevation, time offset to UTC, and so on.</p>
 <span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a>meteo <span class="ot">&lt;-</span> <span class="fu">mc_read_wide</span>(meteo.table, <span class="at">sensor_id =</span> <span class="st">&quot;T_C&quot;</span>, </span>
 <span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a>                      <span class="at">sensor_name =</span> <span class="st">&quot;airTmax&quot;</span>, <span class="at">silent =</span> T)</span>
 <span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a><span class="do">## Read with metadata</span></span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a><span class="do">## Read pre-defined logger with metadata</span></span>
 <span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a><span class="co"># provide two tables. Can be csv files or R data.frame</span></span>
 <span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a>ft <span class="ot">&lt;-</span> <span class="fu">read.table</span>(<span class="st">&quot;files_table.csv&quot;</span>, <span class="at">sep=</span><span class="st">&quot;,&quot;</span>, <span class="at">header =</span> T)</span>
 <span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a>lt <span class="ot">&lt;-</span> <span class="fu">read.table</span>(<span class="st">&quot;localities_table.csv&quot;</span>, <span class="at">sep=</span><span class="st">&quot;,&quot;</span>, <span class="at">header =</span> T)</span>
@@ -708,7 +712,7 @@ start_date
 end_date
 </th>
 <th style="text-align:right;">
-step
+step_seconds
 </th>
 <th style="text-align:left;">
 period
@@ -736,10 +740,10 @@ A1E05
 91184101
 </td>
 <td style="text-align:left;">
-TS_T
+Thermo_T
 </td>
 <td style="text-align:left;">
-TS_T
+Thermo_T
 </td>
 <td style="text-align:left;">
 2020-10-28 08:45:00
@@ -888,10 +892,10 @@ A2E32
 94184103
 </td>
 <td style="text-align:left;">
-TMS_TMSmoisture
+TMS_moist
 </td>
 <td style="text-align:left;">
-TMS_TMSmoisture
+TMS_moist
 </td>
 <td style="text-align:left;">
 2020-10-16 06:15:00
@@ -1040,10 +1044,10 @@ A6W79
 94184102
 </td>
 <td style="text-align:left;">
-TMS_TMSmoisture
+TMS_moist
 </td>
 <td style="text-align:left;">
-TMS_TMSmoisture
+TMS_moist
 </td>
 <td style="text-align:left;">
 2020-10-06 09:00:00
@@ -1221,7 +1225,7 @@ directly as PDF or PNG files on your drive.</p>
 <div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="do">## lines</span></span>
 <span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>tms.plot <span class="ot">&lt;-</span> <span class="fu">mc_filter</span>(tms, <span class="at">localities =</span> <span class="st">&quot;A6W79&quot;</span>)</span>
 <span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>p <span class="ot">&lt;-</span> <span class="fu">mc_plot_line</span>(tms.plot, <span class="at">sensors =</span> <span class="fu">c</span>(<span class="st">&quot;TMS_T3&quot;</span>, <span class="st">&quot;TMS_T1&quot;</span>, <span class="st">&quot;TMS_TMSmoisture&quot;</span>))</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>p <span class="ot">&lt;-</span> <span class="fu">mc_plot_line</span>(tms.plot, <span class="at">sensors =</span> <span class="fu">c</span>(<span class="st">&quot;TMS_T3&quot;</span>, <span class="st">&quot;TMS_T1&quot;</span>, <span class="st">&quot;TMS_moist&quot;</span>))</span>
 <span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>p <span class="ot">&lt;-</span> p<span class="sc">+</span>ggplot2<span class="sc">::</span><span class="fu">scale_x_datetime</span>(<span class="at">date_breaks =</span> <span class="st">&quot;1 week&quot;</span>, <span class="at">date_labels =</span> <span class="st">&quot;%W&quot;</span>)</span>
 <span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>p <span class="ot">&lt;-</span> p<span class="sc">+</span>ggplot2<span class="sc">::</span><span class="fu">xlab</span>(<span class="st">&quot;week&quot;</span>)</span>
 <span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>p <span class="ot">&lt;-</span> p<span class="sc">+</span>ggplot2<span class="sc">::</span><span class="fu">aes</span>(<span class="at">size =</span> sensor_name)</span>
@@ -1371,10 +1375,10 @@ with time as rows, while the long format stacks the sensor columns and
 adds additional columns for variable names and sensor IDs.</p>
 <div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a><span class="do">## wide table of air temperature and soil moisture</span></span>
-<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>tms.wide <span class="ot">&lt;-</span> <span class="fu">mc_reshape_wide</span>(tms.calc, <span class="at">sensors =</span> <span class="fu">c</span>(<span class="st">&quot;TMS_T3&quot;</span>, <span class="st">&quot;vwc_moisture&quot;</span>))</span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>tms.wide <span class="ot">&lt;-</span> <span class="fu">mc_reshape_wide</span>(tms.calc, <span class="at">sensors =</span> <span class="fu">c</span>(<span class="st">&quot;TMS_T3&quot;</span>, <span class="st">&quot;vwc&quot;</span>))</span>
 <span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a><span class="do">## long table of air temperature and soil moisture</span></span>
-<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>tms.long <span class="ot">&lt;-</span> <span class="fu">mc_reshape_long</span>(tms.calc, <span class="at">sensors =</span> <span class="fu">c</span>(<span class="st">&quot;TMS_T3&quot;</span>, <span class="st">&quot;vwc_moisture&quot;</span>))</span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>tms.long <span class="ot">&lt;-</span> <span class="fu">mc_reshape_long</span>(tms.calc, <span class="at">sensors =</span> <span class="fu">c</span>(<span class="st">&quot;TMS_T3&quot;</span>, <span class="st">&quot;vwc&quot;</span>))</span>
 <span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a>tms.long.all <span class="ot">&lt;-</span> <span class="fu">mc_reshape_long</span>(tms.all)</span></code></pre></div>
 <strong>Reshape wide</strong>

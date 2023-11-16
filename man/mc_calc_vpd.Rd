@@ -6,7 +6,7 @@
 \usage{
 mc_calc_vpd(
   data,
-  temp_sensor = "HOBO_T_C",
+  temp_sensor = "HOBO_T",
   rh_sensor = "HOBO_RH",
   output_sensor = "VPD",
   elevation = 0,
@@ -19,7 +19,7 @@ mc_calc_vpd(
 
 \item{temp_sensor}{name of temperature sensor. Temperature sensor must be in T_C physical.}
 
-\item{rh_sensor}{name of relative air humidity sensor. Humidity sensor must be in RH_perc physical.}
+\item{rh_sensor}{name of relative air humidity sensor. Humidity sensor must be in RH physical.}
 
 \item{output_sensor}{name of new virtual VPD sensor (default "VPD")}
 
@@ -33,20 +33,20 @@ mc_calc_vpd(
 myClim object same as input but with added VPD sensor
 }
 \description{
-This function creates new virtual sensor on locality within myClim data object.
-The virtual sensor hosts the vapor pressure deficit (in kPa) calculated
+This function creates a new virtual sensor on locality within the myClim data object.
+The virtual sensor represents the vapor pressure deficit (in kPa) calculated
 from temperature and relative air humidity.
 }
 \details{
-Equation comes from the CR-5 Users Manual 2009–12 from Buck Research modified from Buck (1981)
+Equation are from the CR-5 Users Manual 2009–12 from Buck Research. These equations have been modified from Buck (1981)
 and adapted by Jones, 2013 (eq. 5.15)
 Elevation to pressure conversion function uses eq. 3.7 from Campbell G.S. & Norman J.M. (1998).
 }
 \examples{
-agg_data <- mc_calc_vpd(mc_data_example_agg, "HOBO_T_C", "HOBO_RH", localities="A2E32")
+agg_data <- mc_calc_vpd(mc_data_example_agg, "HOBO_T", "HOBO_RH", localities="A2E32")
 }
 \references{
-Jones H.G. (2014) Plants and Microclimate, Third Edit. Cambridge University Press, Cambridge Buck A.L. (1981)
-New equations for computing vapor pressure and enhancment factor. Journal of Applied Meteorology 20: 1527–1532.
+Jones H.G. (2014) Plants and Microclimate, Third Edit. Cambridge University Press, Cambridge
+Buck A.L. (1981) New equations for computing vapor pressure and enhancment factor. Journal of Applied Meteorology 20: 1527–1532.
 Campbell G.S. & Norman J.M. (1998). An Introduction to Environmental Biophysics, Springer New York, New York, NY
 }

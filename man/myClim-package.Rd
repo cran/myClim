@@ -43,7 +43,7 @@ On the locality in Raw-format there are \code{loggers}; in Agg-format the \code{
 See below. Loggers represents the files imported with myClim reading functions.
 Both \code{loggesr} and \code{sensors} have own metadata. One logger could host more sensors e.g.
 Tomst TMS logger hosing TMS_T1 soil temperature, TMS_T2 surface temperature,
-TMS_T3 air temperature , TMS_TMSmoisture soil moisture.
+TMS_T3 air temperature , TMS_moist soil moisture.
 For detailed description of logger and sensor metadata
 see \link{mc_LoggerMetadata}, \link{mc_SensorMetadata}, \link{mc_data_sensors}
 
@@ -229,10 +229,10 @@ Authors:
 \itemize{
   \item Matěj Man \email{Matej.Man@ibot.cas.cz}
   \item Martin Macek \email{Martin.Macek@ibot.cas.cz}
-  \item Jan Wild \email{Jan.Wild@ibot.cas.cz}
-  \item Martin Kopecký \email{Martin.Kopecky@ibot.cas.cz}
   \item Josef Brůna \email{Josef.Bruna@ibot.cas.cz}
   \item Lucia Hederová \email{Lucia.Hederova@ibot.cas.cz}
+  \item Jan Wild \email{Jan.Wild@ibot.cas.cz}
+  \item Martin Kopecký \email{Martin.Kopecky@ibot.cas.cz}
 }
 
 Other contributors:

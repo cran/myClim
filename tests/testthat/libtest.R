@@ -1,5 +1,9 @@
-not_supported_format_warning <- function(x) {
-    expect_warning(x, regexp = ".* is not a supproted data format. File is skipped.")
+not_applicable_format_warning <- function(x) {
+    expect_warning(x, regexp = ".* is not applicable format to .*\\. File is skipped.")
+}
+
+differnt_values_warning <- function(x) {
+    expect_warning(x, regexp = "In logger .* are different values of .* in same time\\.")
 }
 
 test_raw_data_format <- function(data) {
@@ -18,6 +22,7 @@ test_myClimList <- function(data) {
     expect_equal(names(data), c("metadata", "localities"))
     expect_true(is(data$metadata, "mc_MainMetadata"))
     expect_equal(class(data$localities), "list")
+    expect_false(is.null(names(data$localities)))
 }
 
 test_raw_locality <- function(locality) {
@@ -42,6 +47,7 @@ test_logger <- function(logger) {
     expect_equal(class(logger), "list")
     expect_equal(names(logger), c("metadata", "clean_info", "datetime", "sensors"))
     expect_true(is(logger$metadata, "mc_LoggerMetadata"))
+    expect_true(is.na(logger$metadata@type) || logger$metadata@type %in% myClim:::.model_logger_types)
     expect_true(is(logger$clean_info, "mc_LoggerCleanInfo"))
     test_datetime(logger$datetime)
     expect_equal(class(logger$sensors), "list")
@@ -71,6 +77,7 @@ test_sensor <- function(sensor) {
     expect_equal(class(sensor), "list")
     expect_equal(names(sensor), c("metadata", "values", "calibration", "states"))
     expect_true(is(sensor$metadata, "mc_SensorMetadata"))
+    expect_true(sensor$metadata@sensor_id %in% names(mc_data_sensors))
     expect_equal(class(sensor$calibration), "data.frame")
     expect_true(nrow(sensor$calibration) == 0 || all(colnames(sensor$calibration) == c("datetime", "cor_factor", "cor_slope")))
     expect_true(is.numeric(sensor$values) || is.logical(sensor$values) || all(is.na(sensor$values)))

@@ -1,7 +1,7 @@
 source("libtest.R")
 
 test_that("mc_prep_clean", {
-    cleaned_data <- mc_read_files("../data/clean-datetime_step", "TOMST", silent=T)
+    differnt_values_warning(cleaned_data <- mc_read_files("../data/clean-datetime_step", "TOMST", silent=T))
     expect_warning(mc_prep_clean(cleaned_data, silent=T))
     test_raw_data_format(cleaned_data)
     expect_equal(cleaned_data$localities[["94184102"]]$loggers[[1]]$clean_info@count_duplicities, 1)
@@ -18,13 +18,14 @@ test_that("mc_prep_clean", {
     expect_equal(length(cleaned_data$localities[["94184102"]]$loggers[[1]]$datetime), 49)
     expect_true(is.na(cleaned_data$localities[["94184102"]]$loggers[[1]]$sensors$TMS_T1$values[[19]]))
     expect_equal(cleaned_data$localities[["91184133"]]$loggers[[1]]$clean_info@step, 15 * 60)
-    expect_equal(cleaned_data$localities[["91184133"]]$loggers[[1]]$sensors$TS_T$states$start, dplyr::first(cleaned_data$localities[["91184133"]]$loggers[[1]]$datetime))
+    expect_equal(cleaned_data$localities[["91184133"]]$loggers[[1]]$sensors$Thermo_T$states$start, dplyr::first(cleaned_data$localities[["91184133"]]$loggers[[1]]$datetime))
     agg_data <- mc_agg(cleaned_data)
     expect_error(mc_prep_clean(agg_data))
 })
 
 test_that("mc_prep_clean defined step", {
-    cleaned_data <- mc_read_files("../data/clean-datetime_step", "TOMST", step=30*60, silent=T)
+    differnt_values_warning(cleaned_data <- mc_read_files("../data/clean-datetime_step", "TOMST", step=30*60, silent=T)) %>%
+        suppressWarnings()
     expect_equal(cleaned_data$localities[["94184102"]]$loggers[[1]]$clean_info@step, 30*60)
     expect_equal(length(cleaned_data$localities[["94184102"]]$loggers[[1]]$datetime), 25)
 })
@@ -141,8 +142,54 @@ test_that("mc_prep_crop", {
     cropped_agg_data <- mc_prep_crop(data_calc, start=as.POSIXct("2020-10-16 06:00", tz="UTC"), end=as.POSIXct("2020-10-16 08:00", tz="UTC"))
     expect_equal(cropped_agg_data$localities$A6W79$sensors$TMS_T1$states$start, lubridate::ymd_h("2020-10-16 06"))
     expect_equal(cropped_agg_data$localities$A6W79$sensors$TMS_T1$states$end, lubridate::ymd_h("2020-10-16 08"))
-    expect_equal(nrow(cropped_agg_data$localities$A1E05$sensors$TS_T$states), 0)
+    expect_equal(nrow(cropped_agg_data$localities$A1E05$sensors$Thermo_T$states), 0)
     test_agg_data_format(cropped_agg_data)
+})
+
+test_that("mc_prep_crop by localities", {
+    data <- mc_read_data("../data/TOMST/files_table.csv", "../data/TOMST/localities_table.csv", clean=TRUE, silent=TRUE)
+    agg_data <- mc_agg(data)
+    cropped_data <- mc_prep_crop(data,
+                                 start=as.POSIXct("2020-10-16 06:00", tz="UTC"),
+                                 end=as.POSIXct("2020-10-16 08:00", tz="UTC"),
+                                 localities=c("A1E05", "A2E32"))
+    test_raw_data_format(cropped_data)
+    expect_equal(length(cropped_data$localities$A2E32$loggers[[1]]$datetime), 8)
+    expect_equal(cropped_data$localities$A6W79$loggers[[1]]$datetime, data$localities$A6W79$loggers[[1]]$datetime)
+    cropped_agg_data <- mc_prep_crop(agg_data,
+                                     start=as.POSIXct("2020-10-16 06:00", tz="UTC"),
+                                     end=as.POSIXct("2020-10-16 08:00", tz="UTC"),
+                                     localities=c("A1E05", "A2E32"))
+    test_agg_data_format(cropped_agg_data)
+    expect_equal(length(cropped_agg_data$localities$A2E32$datetime), 8)
+    expect_equal(cropped_agg_data$localities$A6W79$datetime, agg_data$localities$A6W79$datetime)
+    expect_error(cropped_data <- mc_prep_crop(data,
+                                              start=as.POSIXct(c("2020-10-28 09:00", "2020-10-16 07:00"), tz="UTC"),
+                                              end=as.POSIXct(c("2020-10-28 10:00", "2020-10-16 08:00"), tz="UTC"),
+                                              localities="A1E05"))
+    expect_error(cropped_data <- mc_prep_crop(data,
+                                              start=as.POSIXct(c("2020-10-28 09:00", "2020-10-16 07:00"), tz="UTC"),
+                                              end=as.POSIXct(c("2020-10-28 10:00", "2020-10-16 08:00"), tz="UTC")))
+    cropped_data <- mc_prep_crop(data,
+                                 start=as.POSIXct(c("2020-10-28 09:00", "2020-10-16 07:00"), tz="UTC"),
+                                 end=as.POSIXct(c("2020-10-28 10:00", "2020-10-16 08:00"), tz="UTC"),
+                                 localities=c("A1E05", "A2E32"))
+    test_raw_data_format(cropped_data)
+    expect_equal(cropped_data$localities$A1E05$loggers[[1]]$datetime,
+                 as.POSIXct(c("2020-10-28 09:00", "2020-10-28 09:15", "2020-10-28 09:30", "2020-10-28 09:45", "2020-10-28 10:00"), tz="UTC"))
+    expect_equal(cropped_data$localities$A2E32$loggers[[1]]$datetime,
+                 as.POSIXct(c("2020-10-16 07:00", "2020-10-16 07:15", "2020-10-16 07:30", "2020-10-16 07:45", "2020-10-16 08:00"), tz="UTC"))
+    expect_equal(cropped_data$localities$A6W79$loggers[[1]]$datetime, data$localities$A6W79$loggers[[1]]$datetime)
+    cropped_agg_data <- mc_prep_crop(agg_data,
+                                     start=as.POSIXct(c("2020-10-28 09:00", "2020-10-16 07:00"), tz="UTC"),
+                                     end=as.POSIXct(c("2020-10-28 10:00", "2020-10-16 08:00"), tz="UTC"),
+                                     localities=c("A1E05", "A2E32"))
+    test_agg_data_format(cropped_agg_data)
+    expect_equal(cropped_agg_data$localities$A1E05$datetime,
+                 as.POSIXct(c("2020-10-28 09:00", "2020-10-28 09:15", "2020-10-28 09:30", "2020-10-28 09:45", "2020-10-28 10:00"), tz="UTC"))
+    expect_equal(cropped_agg_data$localities$A2E32$datetime,
+                 as.POSIXct(c("2020-10-16 07:00", "2020-10-16 07:15", "2020-10-16 07:30", "2020-10-16 07:45", "2020-10-16 08:00"), tz="UTC"))
+    expect_equal(cropped_agg_data$localities$A6W79$datetime, agg_data$localities$A6W79$datetime)
 })
 
 test_that("mc_prep_crop errors", {
@@ -169,9 +216,9 @@ test_that(".prep_get_loggers_datetime_step_unprocessed", {
 })
 
 test_that(".prep_get_utc_localities", {
-    not_supported_format_warning(data <- mc_read_files("../data/TOMST", "TOMST", clean=FALSE)) %>%
-        not_supported_format_warning() %>%
-        not_supported_format_warning()
+    not_applicable_format_warning(data <- mc_read_files("../data/TOMST", "TOMST", clean=FALSE)) %>%
+        not_applicable_format_warning() %>%
+        not_applicable_format_warning()
     test_function <- if(exists(".prep_get_utc_localities")) .prep_get_utc_localities else .prep_get_utc_localities
     expect_equal(test_function(data), c("91184101", "92192250", "94184102", "94184103", "94184104", "94230002"))
     data_clean <- mc_prep_meta_locality(data, list(`91184101`=60, `92192250`=60, `94184102`=60, `94184103`=60, `94184104`=60, `94230002`=60), "tz_offset")
@@ -187,7 +234,7 @@ test_that("mc_prep_meta_sensor", {
     expect_false("T2" %in% names(cleaned_data$localities$main$loggers[[2]]$sensors))
     expect_warning(agg_data <- mc_agg(cleaned_data), "TMS_Tsoil is renamed to TMS_Tsoil_1") %>%
         expect_warning("sensor TMS_T3 is renamed to TMS_T3_1") %>%
-        expect_warning("sensor TMS_TMSmoisture is renamed to TMS_TMSmoisture_1")
+        expect_warning("sensor TMS_moist is renamed to TMS_moist_1")
     agg_data <- mc_prep_meta_sensor(agg_data, list(TMS_T3_1="TMS_T3_secondary"), localities="main", param_name="name")
     expect_true("TMS_T3_secondary" %in% names(agg_data$localities$main$sensors))
     agg_data <- mc_prep_meta_sensor(agg_data, list(TMS_T3_secondary="air"), param_name="height")
@@ -254,23 +301,23 @@ test_that("mc_prep_calib_load, mc_prep_calib", {
     data <- mc_read_data("../data/TOMST/files_table.csv", clean=FALSE)
     calib_table <- as.data.frame(tibble::tribble(
         ~serial_number,          ~sensor_id,                     ~datetime, ~cor_factor,
-        "91184101",              "TS_T", lubridate::ymd_h("2020-10-28 00"),         0.1,
-        "91184101",              "TS_T", lubridate::ymd_h("2020-10-28 10"),           0,
+        "91184101",              "Thermo_T", lubridate::ymd_h("2020-10-28 00"),         0.1,
+        "91184101",              "Thermo_T", lubridate::ymd_h("2020-10-28 10"),           0,
         "94184102",            "TMS_T1", lubridate::ymd_h("2020-10-16 00"),        0.12,
         "94184102",            "TMS_T2", lubridate::ymd_h("2020-10-16 01"),        0.15,
         "94184102",            "TMS_T3", lubridate::ymd_h("2020-10-16 00"),         0.2,
-        "94184102",   "TMS_TMSmoisture", lubridate::ymd_h("2020-10-16 00"),        0.01,
+        "94184102",   "TMS_moist", lubridate::ymd_h("2020-10-16 00"),        0.01,
     ))
     param_data <- mc_prep_calib_load(data, calib_table)
     test_raw_data_format(param_data)
     calib_table <- as.data.frame(tibble::tribble(
         ~serial_number,          ~sensor_id,                         ~datetime, ~cor_factor, ~cor_slope,
-            "91184101",              "TS_T", lubridate::ymd_h("2020-10-28 00"),         0.1,          0,
-            "91184101",              "TS_T", lubridate::ymd_h("2020-10-28 10"),           0,      -0.05,
+            "91184101",              "Thermo_T", lubridate::ymd_h("2020-10-28 00"),         0.1,          0,
+            "91184101",              "Thermo_T", lubridate::ymd_h("2020-10-28 10"),           0,      -0.05,
             "94184102",            "TMS_T1", lubridate::ymd_h("2020-10-16 00"),        0.12,        0.1,
             "94184102",            "TMS_T2", lubridate::ymd_h("2020-10-16 01"),        0.15,       0.05,
             "94184102",            "TMS_T3", lubridate::ymd_h("2020-10-16 00"),         0.2,          0,
-            "94184102",   "TMS_TMSmoisture", lubridate::ymd_h("2020-10-16 00"),        0.01,          0,
+            "94184102",   "TMS_moist", lubridate::ymd_h("2020-10-16 00"),        0.01,          0,
     ))
     param_data <- mc_prep_calib_load(data, calib_table)
     test_raw_data_format(param_data)
@@ -278,42 +325,76 @@ test_that("mc_prep_calib_load, mc_prep_calib", {
     param_data <- mc_prep_clean(param_data, silent = T)
     calib_data <- mc_prep_calib(param_data)
     test_raw_data_format(calib_data)
-    expect_true(calib_data$localities$A1E05$loggers[[1]]$sensors$TS_T$metadata@calibrated)
-    expect_equal(calib_data$localities$A1E05$loggers[[1]]$sensors$TS_T$values[[1]], 9.875 + 0.1)
-    expect_equal(calib_data$localities$A1E05$loggers[[1]]$sensors$TS_T$values[[6]], 6.875 * 0.95)
+    expect_true(calib_data$localities$A1E05$loggers[[1]]$sensors$Thermo_T$metadata@calibrated)
+    expect_equal(calib_data$localities$A1E05$loggers[[1]]$sensors$Thermo_T$values[[1]], 9.875 + 0.1)
+    expect_equal(calib_data$localities$A1E05$loggers[[1]]$sensors$Thermo_T$values[[6]], 6.875 * 0.95)
     expect_equal(calib_data$localities$A6W79$loggers[[1]]$sensors$TMS_T2$values[[1]], 9.5 * 1.05 + 0.15)
     expect_equal(calib_data$localities$A6W79$loggers[[1]]$sensors$TMS_T2$values[[5]], 9.5 * 1.05 + 0.15)
     expect_true(calib_data$localities$A6W79$loggers[[1]]$sensors$TMS_T3$metadata@calibrated)
-    expect_false(calib_data$localities$A6W79$loggers[[1]]$sensors$TMS_TMSmoisture$metadata@calibrated)
+    expect_false(calib_data$localities$A6W79$loggers[[1]]$sensors$TMS_moist$metadata@calibrated)
     agg_data <- mc_agg(param_data)
-    calib_data <- mc_prep_calib(agg_data, sensors = "TS_T")
+    calib_data <- mc_prep_calib(agg_data, sensors = "Thermo_T")
     test_agg_data_format(calib_data)
-    expect_true(calib_data$localities$A1E05$sensors$TS_T$metadata@calibrated)
-    expect_equal(calib_data$localities$A1E05$sensors$TS_T$values[[1]], 9.875 + 0.1)
-    expect_equal(calib_data$localities$A1E05$sensors$TS_T$values[[6]], 6.875 * 0.95)
+    expect_true(calib_data$localities$A1E05$sensors$Thermo_T$metadata@calibrated)
+    expect_equal(calib_data$localities$A1E05$sensors$Thermo_T$values[[1]], 9.875 + 0.1)
+    expect_equal(calib_data$localities$A1E05$sensors$Thermo_T$values[[6]], 6.875 * 0.95)
+})
+
+test_that("mc_prep_calib_load wrong type", {
+    data <- mc_read_data("../data/TOMST/files_table.csv", clean=FALSE)
+    calib_table <- as.data.frame(tibble::tribble(
+      ~serial_number,          ~sensor_id,   ~datetime, ~cor_factor,
+      "91184101",              "Thermo_T", "2020-10-28 00",         0.1,
+      "91184101",              "Thermo_T", "2020-10-28 10",           0,
+    ))
+    expect_error(mc_prep_calib_load(data, calib_table))
+    calib_table <- as.data.frame(tibble::tribble(
+      ~serial_number,          ~sensor_id,                ~datetime, ~cor_factor,
+      "91184101",              "Thermo_T", lubridate::ymd("2020-10-28"),         0.1,
+      "91184101",              "Thermo_T", lubridate::ymd("2020-10-29"),           0,
+    ))
+    expect_error(mc_prep_calib_load(data, calib_table))
 })
 
 test_that("mc_prep_fillNA", {
     data <- mc_read_files("../data/agg", "TOMST", clean=F)
     expect_error(mc_prep_fillNA(data))
     data <- mc_prep_clean(data, silent=T)
-    data$localities$`91184101`$loggers[[1]]$sensors$TS_T$values[1:4] <- NA_real_
-    data$localities$`91184101`$loggers[[1]]$sensors$TS_T$values[50:52] <- NA_real_
-    data$localities$`91184101`$loggers[[1]]$sensors$TS_T$values[71:75] <- NA_real_
-    data$localities$`91184101`$loggers[[1]]$sensors$TS_T$values[90:95] <- NA_real_
-    data$localities$`91184101`$loggers[[1]]$sensors$TS_T$values[[192]] <- NA_real_
+    data$localities$`91184101`$loggers[[1]]$sensors$Thermo_T$values[1:4] <- NA_real_
+    data$localities$`91184101`$loggers[[1]]$sensors$Thermo_T$values[50:52] <- NA_real_
+    data$localities$`91184101`$loggers[[1]]$sensors$Thermo_T$values[71:75] <- NA_real_
+    data$localities$`91184101`$loggers[[1]]$sensors$Thermo_T$values[90:95] <- NA_real_
+    data$localities$`91184101`$loggers[[1]]$sensors$Thermo_T$values[[192]] <- NA_real_
     data_dupl <- mc_prep_meta_locality(data, list(`91184101`="abc"), "locality_id")
-    data_dupl <- mc_prep_meta_sensor(data_dupl, list(TS_T="T"), "name")
+    data_dupl <- mc_prep_meta_sensor(data_dupl, list(Thermo_T="T"), "name")
     data <- mc_prep_merge(list(data, data_dupl))
     approx_data <- mc_prep_fillNA(data, maxgap=5, localities="91184101")
-    expect_true(is.na(approx_data$localities$`91184101`$loggers[[1]]$sensors$TS_T$values[[1]]))
-    expect_false(is.na(approx_data$localities$`91184101`$loggers[[1]]$sensors$TS_T$values[[51]]))
-    expect_false(is.na(approx_data$localities$`91184101`$loggers[[1]]$sensors$TS_T$values[[71]]))
-    expect_true(is.na(approx_data$localities$`91184101`$loggers[[1]]$sensors$TS_T$values[[95]]))
-    expect_true(is.na(approx_data$localities$`91184101`$loggers[[1]]$sensors$TS_T$values[[192]]))
+    expect_true(is.na(approx_data$localities$`91184101`$loggers[[1]]$sensors$Thermo_T$values[[1]]))
+    expect_false(is.na(approx_data$localities$`91184101`$loggers[[1]]$sensors$Thermo_T$values[[51]]))
+    expect_false(is.na(approx_data$localities$`91184101`$loggers[[1]]$sensors$Thermo_T$values[[71]]))
+    expect_true(is.na(approx_data$localities$`91184101`$loggers[[1]]$sensors$Thermo_T$values[[95]]))
+    expect_true(is.na(approx_data$localities$`91184101`$loggers[[1]]$sensors$Thermo_T$values[[192]]))
     expect_true(is.na(approx_data$localities$abc$loggers[[1]]$sensors$T$values[[50]]))
     approx_data <- mc_prep_fillNA(data, maxgap=5, sensors="T")
     expect_false(is.na(approx_data$localities$abc$loggers[[1]]$sensors$T$values[[50]]))
-    expect_true(is.na(approx_data$localities$`91184101`$loggers[[1]]$sensors$TS_T$values[[50]]))
+    expect_true(is.na(approx_data$localities$`91184101`$loggers[[1]]$sensors$Thermo_T$values[[50]]))
 })
 
+test_that("mc_prep_TMSoffsoil", {
+    data <- mc_read_files("../data/TMSoffsoil/data_93142760_201904.csv", "TOMST", clean=F)
+    expect_error(mc_prep_TMSoffsoil(data))
+    data <- mc_prep_clean(data, silent=T)
+    data_offsoil <- mc_prep_TMSoffsoil(data, smooth=F)
+    test_raw_data_format(data_offsoil)
+    sel0 <- data_offsoil$localities$`93142760`$loggers[[1]]$datetime <= lubridate::ymd_hm("2018-12-05 8:45")
+    sel0 <- sel0 | data_offsoil$localities$`93142760`$loggers[[1]]$datetime > lubridate::ymd_hm("2018-12-09 12:30")
+    expect_true(all(data_offsoil$localities$`93142760`$loggers[[1]]$sensors$off_soil$values[sel0] == 0))
+    sel1 <- data_offsoil$localities$`93142760`$loggers[[1]]$datetime > lubridate::ymd_hm("2018-12-05 8:45")
+    sel1 <- sel1 & data_offsoil$localities$`93142760`$loggers[[1]]$datetime <= lubridate::ymd_hm("2018-12-09 12:30")
+    expect_true(all(data_offsoil$localities$`93142760`$loggers[[1]]$sensors$off_soil$values[sel1] == 1))
+    data_offsoil <- mc_prep_TMSoffsoil(data, smooth=T)
+    expect_true(all(data_offsoil$localities$`93142760`$loggers[[1]]$sensors$off_soil$values == 0))
+    agg_data <- mc_agg(data)
+    agg_data_offsoil <- mc_prep_TMSoffsoil(agg_data, smooth=F)
+    test_agg_data_format(agg_data_offsoil)
+})

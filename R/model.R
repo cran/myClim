@@ -13,61 +13,134 @@
 .model_const_PHYSICAL_l_cm <- "l_cm"
 .model_const_PHYSICAL_l_mm <- "l_mm"
 .model_const_PHYSICAL_l_um <- "l_um"
-.model_const_PHYSICAL_moisture <- "moisture"
+.model_const_PHYSICAL_VWC <- "VWC"
 .model_const_PHYSICAL_p_kPa <- "p_kPa"
-.model_const_PHYSICAL_RH_perc <- "RH_perc"
+.model_const_PHYSICAL_RH <- "RH"
 .model_const_PHYSICAL_T_C <- "T_C"
-.model_const_PHYSICAL_T_F <- "T_F"
 .model_const_PHYSICAL_t_h <- "t_h"
-.model_const_PHYSICAL_TMSmoisture <- "TMSmoisture"
-.model_const_PHYSICAL_TOMSTdendro <- "TOMSTdendro"
+.model_const_PHYSICAL_moisture_raw <- "moisture_raw"
+.model_const_PHYSICAL_radius_raw <- "radius_raw"
 .model_const_PHYSICAL_v <- "v"
 
 .model_const_VALUE_TYPE_REAL <- "real"
 .model_const_VALUE_TYPE_INTEGER <- "integer"
 .model_const_VALUE_TYPE_LOGICAL <- "logical"
 
-# logger sensors
-.model_const_SENSOR_TMS_T1 <- "TMS_T1"
-.model_const_SENSOR_TMS_T2 <- "TMS_T2"
-.model_const_SENSOR_TMS_T3 <- "TMS_T3"
-.model_const_SENSOR_TMS_TMSmoisture <- "TMS_TMSmoisture"
-.model_const_SENSOR_TS_T <- "TS_T"
-.model_const_SENSOR_DEND_T <- "DEND_T"
-.model_const_SENSOR_DEND_TOMSTdendro <- "DEND_TOMSTdendro"
-.model_const_SENSOR_HOBO_T_C <- "HOBO_T_C"
-.model_const_SENSOR_HOBO_T_F <- "HOBO_T_F"
-.model_const_SENSOR_HOBO_RH <- "HOBO_RH"
+### logger sensors
+#' Default sensor for TOMST TMS soil temperature
+#' @description 
+#' This constant is used in the function [myClim::mc_calc_vwc] to account for soil temperature effect
+#' while converting the raw TMS soil moisture (scaled TDT signal) to volumetric water content (VWC). 
+#' mc_const_SENSOR_TMS_T1 = "`r mc_const_SENSOR_TMS_T1`"
+#' @export
+mc_const_SENSOR_TMS_T1 <- "TMS_T1"
+#' Default sensor for TOMST TMS temperature of soil surface
+#' @export
+mc_const_SENSOR_TMS_T2 <- "TMS_T2"
+#' Default sensor for TOMST TMS air temperature
+#' @export
+mc_const_SENSOR_TMS_T3 <- "TMS_T3"
+#' Default sensor for TOMST TMS raw soil moisture
+#' @description 
+#' This constant is used in the function [myClim::mc_calc_vwc] as default for sensor for
+#' converting the raw TMS soil moisture (scaled TDT signal) to volumetric water content (VWC).
+#' mc_const_SENSOR_TMS_moist = "`r mc_const_SENSOR_TMS_moist`"
+#' @export
+mc_const_SENSOR_TMS_moist <- "TMS_moist"
+#' Default sensor for TOMST Thermologger temperature
+#' @export
+mc_const_SENSOR_Thermo_T <- "Thermo_T"
+#' Default sensor for TOMST Dendrometer temperature
+#' @export
+mc_const_SENSOR_Dendro_T <- "Dendro_T"
+#' Default sensor for TOMST Dendrometer radius difference
+#' @description
+#' This constant is used in the function [myClim::mc_calc_tomst_dendro]
+#' as default sensor for converting the change in stem size from raw
+#' TOMST units to micrometers.
+#' mc_const_SENSOR_Dendro_raw = "`r mc_const_SENSOR_Dendro_raw`"
+#' @export
+mc_const_SENSOR_Dendro_raw <- "Dendro_raw"
+#' Onset HOBO temperature sensor id
+#' @export
+mc_const_SENSOR_HOBO_T <- "HOBO_T"
+#' Onset HOBO humidity sensor id
+#' @export
+mc_const_SENSOR_HOBO_RH <- "HOBO_RH"
 
-.model_const_WRONG_CALIBRATION_SENSOR_ID <- .model_const_SENSOR_TMS_TMSmoisture
+.model_const_WRONG_CALIBRATION_SENSOR_ID <- mc_const_SENSOR_TMS_moist
 
-# universal sensors
-.model_const_SENSOR_count <- "count"
-.model_const_SENSOR_coverage <- "coverage"
-.model_const_SENSOR_FDD <- "FDD"
-.model_const_SENSOR_GDD <- "GDD"
-.model_const_SENSOR_precipitation <- "precipitation"
-.model_const_SENSOR_dendro_l_um <- "dendro_l_um"
-.model_const_SENSOR_snow_bool <- "snow_bool"
-.model_const_SENSOR_snow_fresh <- "snow_fresh"
-.model_const_SENSOR_snow_total <- "snow_total"
-.model_const_SENSOR_sun_shine <- "sun_shine"
-.model_const_SENSOR_VPD <- "VPD"
-.model_const_SENSOR_wind <- "wind"
+### universal sensors
+#' Count sensor id see [myClim::mc_agg()]
+#' @export
+mc_const_SENSOR_count <- "count"
+#' Coverage sensor id see [myClim::mc_agg()]
+#' @export
+mc_const_SENSOR_coverage <- "coverage"
+#' Freezing Degree Days sensor id see [myClim::mc_calc_fdd()]
+#' @export
+mc_const_SENSOR_FDD <- "FDD"
+#' Growing Degree Days sensor id see [myClim::mc_calc_gdd()]
+#' @export
+mc_const_SENSOR_GDD <- "GDD"
+#' Precipitation sensor id
+#' @export
+mc_const_SENSOR_precipitation <- "precipitation"
+#' Radius difference sensor id
+#' @export
+mc_const_SENSOR_dendro_l_um <- "dendro_l_um"
+#' Snow existence sensor id see [myClim::mc_calc_snow()]
+#' @export
+mc_const_SENSOR_snow_bool <- "snow_bool"
+#' Height of newly fallen snow sensor id
+#' @export
+mc_const_SENSOR_snow_fresh <- "snow_fresh"
+#' Height snow sensor id
+#' @export
+mc_const_SENSOR_snow_total <- "snow_total"
+#' Time of sun shine sensor id
+#' @export
+mc_const_SENSOR_sun_shine <- "sun_shine"
+#' Vapor Pressure Deficit sensor id see [myClim::mc_calc_vpd()]
+#' @export
+mc_const_SENSOR_VPD <- "VPD"
+#' Speed of wind sensor id
+#' @export
+mc_const_SENSOR_wind_speed <- "wind_speed"
 
-.model_const_SENSOR_moisture <- .model_const_PHYSICAL_moisture
-.model_const_SENSOR_RH_perc <- .model_const_PHYSICAL_RH_perc
-.model_const_SENSOR_T_C <- .model_const_PHYSICAL_T_C
+#' Volumetric soil moisture sensor id see [myClim::mc_calc_vwc()]
+#' @export
+mc_const_SENSOR_VWC <- .model_const_PHYSICAL_VWC
+#' Relative humidity sensor id
+#' @export
+mc_const_SENSOR_RH <- .model_const_PHYSICAL_RH
+#' Temperature sensor id
+#' @export
+mc_const_SENSOR_T_C <- .model_const_PHYSICAL_T_C
 
-.model_const_SENSOR_real <- .model_const_VALUE_TYPE_REAL
-.model_const_SENSOR_integer <- .model_const_VALUE_TYPE_INTEGER
-.model_const_SENSOR_logical <- .model_const_VALUE_TYPE_LOGICAL
+#' General real sensor id
+#' @export
+mc_const_SENSOR_real <- .model_const_VALUE_TYPE_REAL
+#' General integer sensor id
+#' @export
+mc_const_SENSOR_integer <- .model_const_VALUE_TYPE_INTEGER
+#' General logical sensor id
+#' @export
+mc_const_SENSOR_logical <- .model_const_VALUE_TYPE_LOGICAL
 
 .model_const_LOGGER_TOMST_TMS <- "TMS"
 .model_const_LOGGER_TOMST_TMS_L45 <- "TMS_L45"
-.model_const_LOGGER_TOMST_THERMODATALOGGER <- "ThermoDatalogger"
-.model_const_LOGGER_TOMST_DENDROMETER <- "Dendrometer"
+.model_const_LOGGER_TOMST_THERMODATALOGGER <- "Thermo"
+.model_const_LOGGER_TOMST_DENDROMETER <- "Dendro"
 .model_const_LOGGER_HOBO <- "HOBO"
+
+.model_logger_types <- list(
+    .model_const_LOGGER_TOMST_TMS,
+    .model_const_LOGGER_TOMST_TMS_L45,
+    .model_const_LOGGER_TOMST_THERMODATALOGGER,
+    .model_const_LOGGER_TOMST_DENDROMETER,
+    .model_const_LOGGER_HOBO
+)
 
 .model_const_DATA_FORMAT_TOMST <- "TOMST"
 .model_const_DATA_FORMAT_TOMST_join <- "TOMST_join"
@@ -81,6 +154,9 @@
 .model_const_MESSAGE_DATE_TIME_HEADER <- "It is not possible to detect timezone offset from header."
 .model_const_MESSAGE_COLUMNS_PROBLEM <- "It is not possible to detect columns from header."
 .model_const_MESSAGE_HOBO_DATE_FORMAT_PROBLEM <- "HOBO data format required filled in parameter date_format."
+.model_const_MESSAGE_HOBO_CONVERT_FAHRENHEIT <- "Temperature data in \u00b0F is converted to \u00b0C."
+.model_const_MESSAGE_ERROR_DATA_FORMAT <- "The {parameter_name} parameter is required."
+.model_const_MESSAGE_ERROR_DATA_FORMAT_COLUMNS <- "The column list cannot be empty."
 
 .model_const_FORMAT_RAW <- "raw"
 .model_const_FORMAT_AGG <- "agg"
@@ -97,6 +173,48 @@
 #' @export
 myClimList <- function(metadata=NULL, localities=list())
     structure(list(metadata=metadata, localities=localities), class=c("myClimList", "list"))
+
+#' Print function for myClim object
+#'
+#' Function print metadata of myClim object and table from function mc_info().
+#'
+#' @param x myClim object see [myClim-package]
+#' @param ... other parameters from function print for tibble [tibble::tibble]
+#' @export
+#' @examples
+#' print(mc_data_example_agg, n=10)
+print.myClimList <- function(x, ...) {
+    print(stringr::str_glue("myClim object created with myClim package version {x$metadata@version}"))
+    print(stringr::str_glue("{x$metadata@format_type} format"))
+    count_env <- .common_get_count_items(x)
+    if(.common_is_agg_format(x)) {
+        print(stringr::str_glue("{x$metadata@period} period"))
+        print(stringr::str_glue("{count_env$localities} localities, {count_env$sensors} sensors"))
+    }
+    else {
+        print(stringr::str_glue("{count_env$localities} localities, {count_env$loggers} loggers, {count_env$sensors} sensors"))
+    }
+
+    info_df <- mc_info(x)
+    sensors_text <- paste0(sort(unique(info_df$sensor_name)), collapse = ", ")
+    print(stringr::str_glue("sensors: {sensors_text}"))
+    print(tibble::as_tibble(info_df), ...)
+}
+
+#' Extract localities with []
+#'
+#' Using [] for extract localities.
+#'
+#' @param x myClim object see [myClim-package]
+#' @param ... indexes for extract localities
+#' @return myClim object with subset of localities see [myClim-package]
+#' @export
+#' @examples
+#' filtered_data <- mc_data_example_raw[1:2]
+`[.myClimList` <- function(x, ...) {
+    x$localities <- `[`(x$localities, ...)
+    return(x)
+}
 
 # classes ================================================================================
 
@@ -135,9 +253,9 @@ setMethod(
 #' Class for sensor definition
 #' 
 #' Sensor definitions are stored in [mc_data_sensors].
-#' @slot sensor_id unique identifier of sensor (TMS_T1, TMS_T2, TMS_T3, TMS_TMSmoisture, ...)
-#' @slot logger name of logger (TMS, ThermoDatalogger, ...)
-#' @slot physical unit of sensor (T_C, TMSmoisture, moisture, RH_perc) (default NA)
+#' @slot sensor_id unique identifier of sensor (TMS_T1, TMS_T2, TMS_T3, TMS_moist, ...)
+#' @slot logger name of logger (TMS, Thermo, ...)
+#' @slot physical unit of sensor (T_C, moisture_raw, moisture, RH) (default NA)
 #' @slot description character info
 #' @slot value_type type of values (real, integer, logical) (default real)
 #' @slot min_value minimal value (default NA)
@@ -174,12 +292,12 @@ setMethod(f="initialize",
 #' 
 #' Class defining the element of the records (temperature, volumetric water content, height...)
 #' @details See e.g. definition of temperature. Similarly as the definition of new loggers, new
-#' physicals cn be added like modules. 
+#' physicals can be added like modules. 
 #' \preformatted{
 #' Slot "name": "T_C"
-#' slot "description": "Temperature °C"
+#' Slot "description": "Temperature °C"
 #' Slot "units": "°C"
-#' Slot "viridis_color_map": "C"
+#' Slot "viridis_color_map": "C" 
 #' Slot "scale_coeff": 0.03333333
 #' }
 #' @slot name of physical
@@ -281,7 +399,7 @@ setMethod("initialize",
           })
 
 #' Class for logger metadata
-#' @slot type of logger (TMS, ThermoDatalogger, Dendrometer, HOBO)
+#' @slot type of logger (TMS, Thermo, Dendro, HOBO)
 #' @slot serial_number serial number of the logger 
 #' @slot step time step of microclimatic time-seris in seconds.
 #' When provided by user, is used in [mc_prep_clean()] function instead of
@@ -330,7 +448,7 @@ setMethod("initialize",
 #' @details `sensor_id` must be one of the defined id in myClim. see [mc_data_sensors]. 
 #' It is useful to select on of predefined, because it makes plotting and calculaton easier. 
 #' Through `sensor_id` myClim assign pre-deined physicyl units or plotting colors see [mc_Sensor].  
-#' @slot sensor_id unique identifier of sensor (TMS_T1, TMS_T2, TMS_T3, TMS_TMSmoisture, ...) [mc_data_sensors] e.g. TMS_T1, TMS_TMSmoisture, snow_fresh...
+#' @slot sensor_id unique identifier of sensor (TMS_T1, TMS_T2, TMS_T3, TMS_moist, ...) [mc_data_sensors] e.g. TMS_T1, TMS_moist, snow_fresh...
 #' @slot name character, could be same as `sensor_id` but also defined by function or user.  
 #' @slot height character
 #' @slot calibrated logical - detect if sensor is calibrated
@@ -368,17 +486,17 @@ setMethod(
 )
 
 setGeneric(
-    ".model_is_physical_TMSmoisture",
+    ".model_is_physical_moisture_raw",
     function(object){
-        standardGeneric(".model_is_physical_TMSmoisture")
+        standardGeneric(".model_is_physical_moisture_raw")
     }
 )
 
 setMethod(
-    ".model_is_physical_TMSmoisture",
+    ".model_is_physical_moisture_raw",
     "mc_SensorMetadata",
     function(object) {
-        .model_is_physical(object, .model_const_PHYSICAL_TMSmoisture)
+        .model_is_physical(object, .model_const_PHYSICAL_moisture_raw)
     }
 )
 
@@ -455,42 +573,58 @@ setMethod(
     }
 )
 
-#' Class for logger file data format
+#' Class for Logger File Data Format
 #'
-#' The Class used for parsing source data files. Typically the csv files
-#' downloaded from microclimatic loggers. Each supported logger has established
-#' own specific object of class `mc_{logger}DataFormat` defining the parameters.
-#' @details The logger definitions are stored in R environment object
-#' `./data/mc_data_formats.rda`. And thus it easy to add the ability of
-#' reading new, unsupported logger just by defining its Class parameters.
-#' Below see e.g. the Class defining Tomst file format.
-#'  
-#' \preformatted{
-#' An object of class "mc_TOMSTDataFormat"
-#' attr(,"skip"): 0
-#' attr(,"separator"): ";"
-#' attr(,"date_column"): 2
-#' attr(,"date_format"): NA
-#' attr(,"na_strings"): "-200"
-#' attr(,"columns"): list()
-#' attr(,"filename_serial_number_pattern"): "data_(\\d+)_\\d+\\.csv$"
-#' attr(,"data_row_pattern"): "^\\d+;[\\d.: ]+;\\d+;-?\\d+[.,]?\\d*;-?\\d+[.,]?\\d*;-?\\d+[.,]?\\d*;\\d+;\\d+;\\d+.*$"
-#' attr(,"logger_type"): character(0)
-#' }
+#' This class is used for parsing source TXT/CSV files downloaded from microclimatic
+#' loggers.
+#'
+#' @details myClim offers several pre-defined
+#' logger file data formats, such as TOMST TMS or HOBO. Users can also define custom
+#' readings for their own loggers. Pre-defined and custom loggers in myClim each have
+#' their own specific object of class `mc_{logger}DataFormat`, which defines the
+#' parameters for handling logger files.
+#' The pre-defined logger definitions are stored in the R environment object
+#' `./data/mc_data_formats.rda`.
 #' 
-#' @slot skip number of lines before data - header etc. (default 0)
-#' @slot separator columns separator (default NA)
-#' @slot date_column index of date column (default NA)
-#' @slot date_format format of date (default NA)
-#' @slot na_strings strings for NA values (default NA)
-#' @slot error_value value means error of sensor (default NA)
-#' @slot columns list with names and indexes of value columns (default list())
-#' @slot filename_serial_number_pattern character pattern for detecting serial_number from file name (default NA)
-#' @slot data_row_pattern character pattern for detecting right file format (default NA)
+#' @slot skip The number of rows to skip before the first row containing microclimatic records.
+#' For example, to skip the header (default 0).
+#' @slot separator The column separator (default is a comma ",").
+#' @slot date_column The index of the date column - required (default NA).
+#' @slot date_format The format of the date (default NA).
 #'
-#' If data_row_pattern is NA, then file format is not validated.
-#' @slot logger_type type of logger: TMS, TMS_L45, ThermoDatalogger, Dendrometer, HOBO, ... (default NA)
-#' @slot tz_offset timezone offset in minutes from UTC in source data (default 0)
+#' For a description of the date_format parameter, see [strptime()]. If the format is in ISO8601
+#' and the function [vroom::vroom()] automatically detects datetime values,
+#' the date_format parameter can be NA.
+#' @slot na_strings Strings for representing NA values, e.g., "-100", "9999" (default "").
+#' @slot error_value The value that represents an error of the sensor, e.g., 404, 9999 (default NA).
+#'
+#' The error_value is replaced by NA, and intervals of errors are flagged in `sensor$states`
+#' (see [myClim-package]).
+#' @slot columns A list with names and indexes of value columns - required (default list()).
+#'
+#' Names come from names(mc_data_sensors). Names are defined as constants `mc_const_SENSOR_*`.
+#' For example, if the third column is temperature, you can define it as `columns[[mc_const_SENSOR_T_C]] <- 3`.
+#' There are universal sensors for arbitrary value types: `mc_const_SENSOR_real`, `mc_const_SENSOR_integer`
+#' and `mc_const_SENSOR_logical`. Multiple columns with same sensor type can be defined
+#' as `columns[[mc_const_SENSOR_real]] <- c(2, 3, 4)`. The names in this example will be `real1`, `real2` and `real3`.
+#' @slot col_types Parameter for [vroom::vroom()] (default NA).
+#'
+#' To ensure the correct reading of values, you have the possibility to strictly define the types of columns.
+#' @slot filename_serial_number_pattern A character pattern for detecting the serial number from the file name (default NA).
+#'
+#' The regular expression with brackets around the serial number.
+#' For example, the pattern for old TOMST files is `"data_(\\d+)_\\d+\\.csv$"`. If the value is NA, the name of the file is used
+#' as the serial number.
+#' @slot data_row_pattern A character pattern for detecting the correct file format (default NA).
+#'
+#' The regular expression. If data_row_pattern is NA, then the file format is not checked.
+
+#' @slot logger_type The type of logger: TMS, TMS_L45, Thermo, Dendro, HOBO, ... (default NA).
+#' @slot tz_offset The timezone offset in minutes from UTC - required (default NA).
+#'
+#' If the value of the tz_offset parameter is 0, then datetime values are in UTC.
+#' If the time zone offset is defined in the value, e.g., `"2020-10-06 09:00:00+0100"`,
+#' and `date_format` is `"%Y-%m-%d %H:%M:%S%z"`, the value is automatically converted to UTC.
 #' @exportClass mc_DataFormat
 #' @seealso [mc_data_formats], [mc_TOMSTDataFormat-class], [mc_TOMSTJoinDataFormat-class], [mc_HOBODataFormat-class]
 mc_DataFormat <- setClass("mc_DataFormat",
@@ -501,6 +635,7 @@ mc_DataFormat <- setClass("mc_DataFormat",
                                     na_strings = "character",
                                     error_value = "numeric",
                                     columns = "list",
+                                    col_types = "character",
                                     filename_serial_number_pattern = "character",
                                     data_row_pattern = "character",
                                     logger_type = "character",
@@ -510,12 +645,13 @@ setMethod("initialize",
           "mc_DataFormat",
           function(.Object) {
               .Object@skip <- 0
-              .Object@separator <- NA_character_
+              .Object@separator <- ","
               .Object@date_column <- NA_integer_
               .Object@date_format <- NA_character_
-              .Object@na_strings <- NA_character_
+              .Object@na_strings <- ""
               .Object@error_value <- NA_integer_
               .Object@columns <- list()
+              .Object@col_types <- NA_character_
               .Object@filename_serial_number_pattern <- NA_character_
               .Object@data_row_pattern <- NA_character_
               .Object@logger_type <- NA_character_
@@ -523,7 +659,7 @@ setMethod("initialize",
               return(.Object)
           })
 
-#' Class for reading Tomst logger files
+#' Class for reading TOMST logger files
 #' 
 #' Provides the key for the column in source files. Where is the date, 
 #' in what format is the date, in which columns are records of which sensors.
@@ -540,7 +676,7 @@ mc_TOMSTDataFormat <- setClass("mc_TOMSTDataFormat",
 #' in what format is the date, in which columns are records of which sensors.
 #' The code defining the class is in section methods ./R/model.R
 #' 
-#' TMS join file format is the output of IBOT internal post-processing of Tomst logger files.
+#' TMS join file format is the output of IBOT internal post-processing of TOMST logger files.
 #' @seealso [myClim::mc_DataFormat],[mc_data_formats],[mc_TOMSTDataFormat-class], [mc_TOMSTJoinDataFormat-class]
 #' @exportClass mc_TOMSTJoinDataFormat
 mc_TOMSTJoinDataFormat <- setClass("mc_TOMSTJoinDataFormat", contains = "mc_DataFormat")
@@ -551,9 +687,20 @@ mc_TOMSTJoinDataFormat <- setClass("mc_TOMSTJoinDataFormat", contains = "mc_Data
 #' in what format is the date, in which columns are records of which sensors.
 #' The code defining the class is in section methods ./R/model.R
 #'
+#' @slot convert_fahrenheit if TRUE temperature values are converted from °F to °C (default FALSE)
 #' @seealso [myClim::mc_DataFormat], [mc_data_formats]
 #' @exportClass mc_HOBODataFormat
-mc_HOBODataFormat <- setClass("mc_HOBODataFormat", contains = "mc_DataFormat")
+mc_HOBODataFormat <- setClass("mc_HOBODataFormat",
+                              slots = c(convert_fahrenheit = "logical"),
+                              contains = "mc_DataFormat")
+
+setMethod("initialize",
+          "mc_HOBODataFormat",
+          function(.Object) {
+              .Object <- callNextMethod(.Object)
+              .Object@convert_fahrenheit <- FALSE
+              return(.Object)
+          })
 
 # generics ================================================================================
 
@@ -575,6 +722,13 @@ setGeneric(
     ".model_edit_data",
     function(object, data_table){
         standardGeneric(".model_edit_data")
+    }
+)
+
+setGeneric(
+    ".model_check_format",
+    function(object){
+        standardGeneric(".model_check_format")
     }
 )
 
@@ -621,7 +775,9 @@ setMethod(
         }
         data <- .read_get_data_from_file(path, object, nrows = .model_const_COUNT_TEST_VALUES)
         object@date_format <- .get_tomst_datetime_format(data, object@date_column)
-        .change_tomst_columns_and_logger_type(object, data)
+        object <- .model_change_tomst_columns_and_logger_type(object, data)
+        object <- .model_tomst_change_col_type(object, data)
+        return(object)
     }
 )
 
@@ -637,16 +793,16 @@ setMethod(
     return(NA_character_)
 }
 
-.change_tomst_columns_and_logger_type <- function(object, data){
+.model_change_tomst_columns_and_logger_type <- function(object, data){
     tm_columns <- list(4)
-    names(tm_columns) <- .model_const_SENSOR_TS_T
+    names(tm_columns) <- mc_const_SENSOR_Thermo_T
     dendro_columns <- list(4, 7)
-    names(dendro_columns) <- c(.model_const_SENSOR_DEND_T, .model_const_SENSOR_DEND_TOMSTdendro)
+    names(dendro_columns) <- c(mc_const_SENSOR_Dendro_T, mc_const_SENSOR_Dendro_raw)
     tms_columns <- list(4, 5, 6, 7)
-    names(tms_columns) <- c(.model_const_SENSOR_TMS_T1, .model_const_SENSOR_TMS_T2, .model_const_SENSOR_TMS_T3,
-                            .model_const_SENSOR_TMS_TMSmoisture)
-    if(all(is.na(data[[tms_columns[[.model_const_SENSOR_TMS_T2]]]]))) {
-        if(all(data[[dendro_columns[[.model_const_SENSOR_DEND_TOMSTdendro]]]] == .model_const_TOMST_THERMODATALOGGER_VALUE)) {
+    names(tms_columns) <- c(mc_const_SENSOR_TMS_T1, mc_const_SENSOR_TMS_T2, mc_const_SENSOR_TMS_T3,
+                            mc_const_SENSOR_TMS_moist)
+    if(all(is.na(data[[tms_columns[[mc_const_SENSOR_TMS_T2]]]]))) {
+        if(all(data[[dendro_columns[[mc_const_SENSOR_Dendro_raw]]]] == .model_const_TOMST_THERMODATALOGGER_VALUE)) {
             object@columns <- tm_columns
             logger_type <- .model_const_LOGGER_TOMST_THERMODATALOGGER
         } else {
@@ -663,6 +819,14 @@ setMethod(
     object
 }
 
+.model_tomst_change_col_type <- function(object, data) {
+    has_comma <- purrr::map_lgl(object@columns, ~ any(stringr::str_detect(data[[.x]], ","), na.rm=TRUE))
+    if(!any(has_comma)) {
+        object@col_types <- "icinnniin"
+    }
+    return(object)
+}
+
 setMethod(
     ".model_load_data_format_params_from_file",
     "mc_TOMSTJoinDataFormat",
@@ -671,21 +835,21 @@ setMethod(
             return(NULL)
         }
         data <- .read_get_data_from_file(path, object, nrows = .model_const_COUNT_TEST_VALUES)
-        .change_tomst_join_columns_and_logger_type(object, data)
+        .model_change_tomst_join_columns_and_logger_type(object, data)
     }
 )
 
-.change_tomst_join_columns_and_logger_type <- function(object, data){
+.model_change_tomst_join_columns_and_logger_type <- function(object, data){
     tmj_columns <- list(5)
-    names(tmj_columns) <- .model_const_SENSOR_TS_T
+    names(tmj_columns) <- mc_const_SENSOR_Thermo_T
     tmsj_columns <- list(5, 6, 7, 8, 9)
-    names(tmsj_columns) <- c(.model_const_SENSOR_TMS_T1, .model_const_SENSOR_TMS_T2,.model_const_SENSOR_TMS_T3,
-                             .model_const_SENSOR_TMS_TMSmoisture, .model_const_SENSOR_moisture)
-    is_T1_NA <- all(is.na(data[[tmsj_columns[[.model_const_SENSOR_TMS_T1]]]]))
-    is_NA_T2_T3 <- all(is.na(data[[tmsj_columns[[.model_const_SENSOR_TMS_T2]]]])) &&
-        all(is.na(data[[tmsj_columns[[.model_const_SENSOR_TMS_T3]]]]))
-    is_T1_T2_T3_equals <- (all(data[[tmsj_columns[[.model_const_SENSOR_TMS_T1]]]] == data[[tmsj_columns[[.model_const_SENSOR_TMS_T2]]]]) &&
-        all(data[[tmsj_columns[[.model_const_SENSOR_TMS_T1]]]] == data[[tmsj_columns[[.model_const_SENSOR_TMS_T3]]]]))
+    names(tmsj_columns) <- c(mc_const_SENSOR_TMS_T1, mc_const_SENSOR_TMS_T2,mc_const_SENSOR_TMS_T3,
+                             mc_const_SENSOR_TMS_moist, mc_const_SENSOR_VWC)
+    is_T1_NA <- all(is.na(data[[tmsj_columns[[mc_const_SENSOR_TMS_T1]]]]))
+    is_NA_T2_T3 <- all(is.na(data[[tmsj_columns[[mc_const_SENSOR_TMS_T2]]]])) &&
+        all(is.na(data[[tmsj_columns[[mc_const_SENSOR_TMS_T3]]]]))
+    is_T1_T2_T3_equals <- (all(data[[tmsj_columns[[mc_const_SENSOR_TMS_T1]]]] == data[[tmsj_columns[[mc_const_SENSOR_TMS_T2]]]]) &&
+        all(data[[tmsj_columns[[mc_const_SENSOR_TMS_T1]]]] == data[[tmsj_columns[[mc_const_SENSOR_TMS_T3]]]]))
     if(!is_T1_NA && (is_NA_T2_T3 || is_T1_T2_T3_equals)) {
         object@columns <- tmj_columns
         if(is.na(object@logger_type)) {
@@ -696,9 +860,9 @@ setMethod(
     if(is.na(object@logger_type)) {
         object@logger_type <- .model_const_LOGGER_TOMST_TMS
     }
-    moisture <- data[[tmsj_columns[[.model_const_SENSOR_moisture]]]]
+    moisture <- data[[tmsj_columns[[mc_const_SENSOR_VWC]]]]
     if(!any(is.na(moisture)) && all(moisture == 0)) {
-        object@columns <- within(tmsj_columns, rm(moisture))
+        object@columns <- tmsj_columns[names(tmsj_columns) != mc_const_SENSOR_VWC]
         return(object)
     }
     object@columns <- tmsj_columns
@@ -715,10 +879,10 @@ setMethod(
         if(is.na(object@separator)) {
             return(NULL)
         }
+        object <- .model_hobo_set_skip(object, lines)
         data <- .read_get_data_from_file(path, object, nrows = count_lines)
-        data[1, 1] <- stringr::str_trim(data[1, 1])
-        object <- .model_hobo_set_skip(object, data)
-        has_numbers_column <- data[[1]][[object@skip]] == "#"
+        object@skip <- object@skip + 1
+        has_numbers_column <- data[[1]][[1]] == "#"
         object <- .model_hobo_set_date_column(object, data, has_numbers_column)
         if(is.na(object@date_column)) {
             return(NULL)
@@ -756,18 +920,18 @@ setMethod(
     return(NA_character_)
 }
 
-.model_hobo_set_skip <- function(object, data) {
-    if(stringr::str_starts(data[[1]][[1]], "Plot Title:")) {
-        object@skip <- 2
-    } else {
+.model_hobo_set_skip <- function(object, lines) {
+    if(stringr::str_starts(lines[[1]], '"?Plot Title:')) {
         object@skip <- 1
+    } else {
+        object@skip <- 0
     }
     object
 }
 
 .model_hobo_set_date_column <- function (object, data, has_numbers_column) {
     date_column <- if(has_numbers_column) 2 else 1
-    if(data[[date_column]][[object@skip]] == "Date") {
+    if(data[[date_column]][[1]] == "Date") {
         warning(.model_const_MESSAGE_SEPARATED_TIME)
         return(object)
     }
@@ -779,11 +943,11 @@ setMethod(
     if(!is.na(object@tz_offset)) {
         return(object)
     }
-    if(data[[object@date_column]][[object@skip]] == "Date Time") {
+    if(data[[object@date_column]][[1]] == "Date Time") {
         object@tz_offset <- 0
         return(object)
     }
-    parts <- stringr::str_match(data[[object@date_column]][[object@skip]], "Date Time, GMT([+-])(\\d{2}):(\\d{2})")
+    parts <- stringr::str_match(data[[object@date_column]][[1]], "Date Time, GMT([+-])(\\d{2}):(\\d{2})")
     if(is.na(parts[[1, 1]])) {
         warning(.model_const_MESSAGE_DATE_TIME_HEADER)
         object@tz_offset <- NA_integer_
@@ -794,31 +958,37 @@ setMethod(
 }
 
 .model_hobo_set_columns <- function(object, data, has_numbers_column) {
+    col_types <- rep("c", ncol(data))
     add_count_columns <- if(has_numbers_column) 1 else 0
     temp_column <- 2 + add_count_columns
     rh_column <- 3 + add_count_columns
-    parts <- stringr::str_match(data[[temp_column]][[object@skip]], "Temp,? \\(?(.[CF])\\)?")
+    parts <- stringr::str_match(data[[temp_column]][[1]], "Temp,? \\(?(.[CF])\\)?")
     if(is.na(parts[[1, 2]])) {
         warning(.model_const_MESSAGE_COLUMNS_PROBLEM)
         return(object)
     }
-    temp_sensor_id <- .model_const_SENSOR_HOBO_T_C
+    temp_sensor_id <- mc_const_SENSOR_HOBO_T
     if(parts[[1, 2]] == "\u00b0F") {
-        temp_sensor_id <- .model_const_SENSOR_HOBO_T_F
+        object@convert_fahrenheit <- TRUE
     }
     columns <- list()
     columns[[temp_sensor_id]] <- temp_column
+    col_types[[temp_column]] <- "d"
     if(ncol(data) < rh_column){
         object@columns <- columns
+        object@col_types <- paste0(col_types, collapse="")
         return(object)
     }
-    parts <- stringr::str_match(data[[rh_column]][[object@skip]], "RH,? \\(?%\\)?")
+    parts <- stringr::str_match(data[[rh_column]][[1]], "RH,? \\(?%\\)?")
     if(is.na(parts[[1, 1]])) {
         object@columns <- columns
+        object@col_types <- paste0(col_types, collapse="")
         return(object)
     }
-    columns[[.model_const_SENSOR_HOBO_RH]] <- rh_column
+    columns[[mc_const_SENSOR_HOBO_RH]] <- rh_column
+    col_types[[rh_column]] <- "d"
     object@columns <- columns
+    object@col_types <- paste0(col_types, collapse="")
     object
 }
 
@@ -840,16 +1010,18 @@ setMethod(
     ".model_get_serial_number_from_file",
     signature("mc_DataFormat"),
     function(object, path) {
-        if(is.null(object@filename_serial_number_pattern)) {
-          stop(stringr::str_glue("It is not possible identify serial_number from file. Pattern is missed in data_format."))
+        result <- NA_character_
+        if(!is.na(object@filename_serial_number_pattern)) {
+            result <- stringr::str_match(basename(path), object@filename_serial_number_pattern)[1, 2]
         }
-        result <- stringr::str_match(basename(path), object@filename_serial_number_pattern)[1, 2]
         if(is.na(result)) {
             result <- stringr::str_match(basename(path), "(.+)\\.[^.]+")[1, 2]
             if(is.na(result)) {
                 result <- basename(path)
             }
-            warning(stringr::str_glue("It is not possible identify serial_number from file. Name {result} is used."))
+            if(!is.na(object@filename_serial_number_pattern)) {
+                warning(stringr::str_glue("It is not possible identify serial_number from file. Name {result} is used."))
+            }
         }
         result
     }
@@ -861,7 +1033,8 @@ setMethod(
     function(object, path) {
         changed_object <- object
         changed_object@skip <- object@skip - 1
-        data <- .read_get_data_from_file(path, changed_object, nrows = 1)
+        changed_object@col_types <- paste0(rep("c", nchar(object@col_types)), collapse="")
+        data <- .read_get_data_from_file(path, changed_object, nrows=1)
         temp_column <- changed_object@columns[[1]]
         parts <- stringr::str_match(data[[temp_column]][[1]], "Temp,? \\(?\u00b0[CF]\\)? \\(?LGR S\\/N: (\\d+),")
         if(is.na(parts[[1, 2]])) {
@@ -883,6 +1056,11 @@ setMethod(
     ".model_edit_data",
     "mc_HOBODataFormat",
     function(object, data_table) {
+        if(object@convert_fahrenheit && mc_const_SENSOR_HOBO_T %in% names(object@columns)) {
+            column_index <- object@columns[[mc_const_SENSOR_HOBO_T]]
+            warning(.model_const_MESSAGE_HOBO_CONVERT_FAHRENHEIT)
+            data_table[[column_index]] <- (data_table[[column_index]] - 32) * 5 / 9
+        }
         last_value_column <- max(unlist(object@columns))
         if(ncol(data_table) == last_value_column) {
             return(data_table)
@@ -892,6 +1070,22 @@ setMethod(
         logged_values <- purrr::map((last_value_column+1):ncol(data_table), ~ data_table[[.x]] == "Logged")
         logged_values <- purrr::reduce(logged_values, `|`)
         data_table[!(na_values & logged_values),]
+    }
+)
+
+setMethod(
+    ".model_check_format",
+    "mc_DataFormat",
+    function(object) {
+        required_parameters <- c("date_column", "tz_offset")
+        for(parameter_name in required_parameters) {
+            if(is.na(slot(object, parameter_name))){
+                stop(stringr::str_glue(.model_const_MESSAGE_ERROR_DATA_FORMAT))
+            }
+        }
+        if(length(object@columns) == 0) {
+            stop(.model_const_MESSAGE_ERROR_DATA_FORMAT_COLUMNS)
+        }
     }
 )
 

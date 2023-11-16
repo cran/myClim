@@ -12,7 +12,10 @@ mc_plot_line(
   png_width = 1900,
   png_height = 1900,
   start_crop = NULL,
-  end_crop = NULL
+  end_crop = NULL,
+  use_utc = TRUE,
+  localities = NULL,
+  facet = "locality"
 )
 }
 \arguments{
@@ -22,7 +25,7 @@ mc_plot_line(
 
 If NULL then the plot is displayed and can be returned into r environment but is not saved to file.}
 
-\item{sensors}{select the names of sensors to be plotted (max 2) see \code{names(mc_data_sensors)}}
+\item{sensors}{names of sensors; if NULL then all (default NULL) see \code{names(mc_data_sensors)}}
 
 \item{scale_coeff}{scale coefficient for secondary axis (default NULL)}
 
@@ -30,34 +33,60 @@ If NULL then the plot is displayed and can be returned into r environment but is
 
 \item{png_height}{height for png output (default 1900)}
 
-\item{start_crop}{POSIXct datetime for crop data (default NULL)}
+\item{start_crop}{POSIXct datetime in UTC for crop data (default NULL)}
 
-\item{end_crop}{POSIXct datetime for crop data (default NULL)}
+\item{end_crop}{POSIXct datetime in UTC for crop data (default NULL)}
+
+\item{use_utc}{if FALSE, then the time shift from \code{tz_offset} metadata is used to correct
+(shift) the output time-series (default TRUE)
+
+In the Agg-format myClim object \code{use_utc = FALSE} is allowed only for steps shorter than one day. In myClim
+the day nd longer time steps are defined by the midnight, but this represent whole day, week, month, year...
+shifting daily, weekly, monthly... data (shift midnight) does not make sense in our opinion.
+But when user need more flexibility, then myClim Raw-format
+can be used, In Raw-format \code{use_utc} is not limited, user can shift an data without the restrictions.
+See \link{myClim-package}}
+
+\item{localities}{names of localities; if NULL then all (default NULL)}
+
+\item{facet}{possible values (\code{NULL}, \code{"locality"}, \code{"physical"})
+\itemize{
+\item \code{facet = "locality"} each locality is plotted (default)
+in separate plot in R and separate row in PDF if filename.pdf is provided.
+\item \code{facet = "physical"} sensors with  identical physical (see \link{mc_data_physical}) are grouped together across localities.
+\item \code{facet = NULL}, all localities and sensors (max 2 physicals, see details) are plotted
+in single plot
+}}
 }
 \value{
 ggplot2 object
 }
 \description{
 Function plots data with ggplot2 geom_line. Plot is returned as ggplot faced grid and
-is primary designed to be saved as PDF file. PNG is also possible, the same as
-plotting ggplot object into R environment. See details.
+is optimized for saving as facet, paginated PDF file.
 }
 \details{
 Saving as the PDF file is recommended, because the plot is optimized
-to be paginate PDF (facet raster plot is distributed to pages), which is especially useful
-for bigger data. Maximal number of physical units (elements) of sensors to be plotted in one
-plot is two with main and secondary y axis. In case, there are multiple sensors with
-identical physical on one locality, they are plotted together. E.g., when you have
-TMS_T1, TMS_T2, TMS_T3, TS_T, and moisture you get plot with 5 lines of different colors and
+to be paginate PDF (facet line plot is distributed to pages), each locality can be
+represented by separate plot (\code{facet = "locality"}) default, which is especially useful
+for bigger data. When \code{facet = NULL} then single plot is returned showing all localities together.
+When \code{facet = physical} sensors with identical physical units are grouped together across localities.
+Maximal number of physical units (elements) of sensors to be plotted in one
+plot is two. First element is related to primary and second to secondary y axis.
+In case, there are multiple sensors with identical physical on one locality,
+they are plotted together for \code{facet = "locality"} e.g., when you have
+TMS_T1, TMS_T2, TMS_T3, Thermo_T, and VWC you get plot with 5 lines of different colors and
 two y axes. Secondary y axes are scaled with calculation \code{values * scale_coeff}.
-If coefficient is NULL than function try detects scale coefficient from
+If scaling coefficient is NULL than function try to detects scale coefficient from
 physical unit of sensors see \linkS4class{mc_Physical}. Scaling is useful when
-plotting together e.g. temperature and moisture. For TMS and HOBO scaling coefficients
-are estimated automatically, correctly. For other data it is better to set it by hand.
+plotting together e.g. temperature and moisture. For native myClim loggers
+(TOMST, HOBO U-23) scaling coefficients are pre-defined.
+For other cases when plotting two physicals together,
+it is better to set scaling coefficients by hand.
 }
 \examples{
 tms.plot <- mc_filter(mc_data_example_agg, localities = "A6W79")
-p <- mc_plot_line(tms.plot,sensors = c("TMS_T3","TMS_T1","TMS_TMSmoisture"))
+p <- mc_plot_line(tms.plot,sensors = c("TMS_T3","TMS_T1","TMS_moist"))
 p <- p+ggplot2::scale_x_datetime(date_breaks = "1 week", date_labels = "\%W")
 p <- p+ggplot2::xlab("week")
 p <- p+ggplot2::scale_color_manual(values=c("hotpink","pink", "darkblue"),name=NULL)
