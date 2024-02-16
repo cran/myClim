@@ -1,3 +1,50 @@
+# myClim 1.1.0
+* Fixed an issue with the read progress bar when some files were skipped.
+* Changed the logger type `HOBO` to `HOBO_U23-001A`.
+* Added support for the logger type `HOBO_U23-004`.
+
+# myClim 1.0.19
+* Fixed an issue that affected the calibration table after calling the `mc_join()` function.
+* Added a file counter to the `mc_plot_loggers()` function.
+
+# myClim 1.0.18
+* Fixed temperature drift correction in the `mc_calc_vwc()` function.
+* Resolved the issue where the `vroom::problems()` function did not function properly when tidyverse was imported.
+  This is now handled in the read functions.
+* Disabled progress bar for the `vroom::vroom()` function.
+
+# myClim 1.0.17
+* Multiple custom date formats can be defined for TOMST data format.
+
+# myClim 1.0.16
+* A new function, `mc_info_join()`, has been added. This function attempts to join myClim objects
+  and returns an overview of the operation.
+* The skip option has been added to the `mc_join()` function.
+* The `mc_read_data()` function can now read HOBO files which use a comma as the decimal separator.
+* The logger index has now been added to the column name in the `mc_reshape_wide()` function.
+* Progress bars have been added to the `mc_read_data()`, `mc_prep_clean()`, `mc_join()`, and `mc_agg()` functions.
+* When new sensors are created from a custom function in the `mc_agg()` function, they now inherit the `sensor_id`
+  from the parent sensors.
+* If a wrong physical unit is input into the calc functions, it will now result in a warning instead of an error.
+
+# myClim 1.0.15
+* when reading `TOMST_join` format (internal TOMST data format used by IBOT researchers) the `mc_read_data()`
+  function now uses the `Thermo` value of the `logger_type` parameter when reading TOMST Termo Logger
+  and does not detect the type of the logger from the data.
+* A new function, `mc_info_logger()`, has been added. This function returns an overview table of loggers in myClim Raw-format.
+* The issue with NA values in the `mc_join()` function has been fixed.
+* The issue with always choices in the `mc_join()` function has been fixed.
+* The `TRUE` value in `TOMST_join` is now correctly detected.
+* The `mc_join()` function does not fail if a wrong logger type is defined.
+
+# myClim 1.0.14
+* The function `mc_read_data()` now skips non-existent files.
+* The `length()` function now returns the number of localities for `myClim` object.
+* Detection of `TOMST_join` format is now fixed for negative values of moisture.
+
+# myClim 1.0.13
+* The issue of NA values at the beginning of TOMST_join format data files has been resolved.
+
 # myClim 1.0.12
 * A new `facet` parameter has been added to the `mc_plot_line()` function to provide more flexibility 
   in data visualization.

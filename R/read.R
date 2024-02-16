@@ -8,6 +8,10 @@
 .read_const_MESSAGE_UNSUPPOERTED_FORMAT <- "{data_format} is not a supported data format. File is skipped."
 .read_const_MESSAGE_UNAPLICABLE_FORMAT <- "{data_format} is not applicable format to {path}. File is skipped."
 .read_const_MESSAGE_USER_DATA_FORMAT_KEY <- "The key in user_data_format must not be the same as the key in mc_data_formats."
+.read_const_MESSAGE_VROOM_WARNING <- "Parsing issues in file {filename}"
+.read_const_MESSAGE_FILE_SKIP <- "File {.x} does not exist - skipping."
+
+.read_state <- new.env()
 
 #' Reading files or directories
 #'
@@ -66,8 +70,9 @@ mc_read_files <- function(paths, dataformat_name, logger_type=NA_character_, rec
         files <- paths
     }
     files_table <- data.frame(path=files, locality_id=NA_character_, data_format=dataformat_name,
-                              serial_number=NA_character_, logger_type=logger_type, date_format=date_format, tz_offset=tz_offset,
-                              step=step)
+                              serial_number=NA_character_, logger_type=logger_type,
+                              tz_offset=tz_offset, step=step)
+    files_table$date_format <- rep(list(date_format), nrow(files_table))
     mc_read_data(files_table, clean=clean, silent=silent, user_data_formats=user_data_formats)
 }
 
@@ -106,8 +111,8 @@ mc_read_files <- function(paths, dataformat_name, logger_type=NA_character_, rec
 #' If not provided, myClim tries to detect loger_type from the source data file structure (applicable for HOBO, Dendro, Thermo and TMS), but automatic detection of TMS_L45 is not possible.
 #' Pre-defined logger types are: ("Dendro", "HOBO", "Thermo", "TMS", "TMS_L45")
 #' Default heights of sensor based on logger types are defined in table [mc_data_heights]
-#' * date_format - for reading HOBO format of date in strptime function (e.g. "%d.%m.%y %H:%M:%S");
-#' Ignored for TOMST data format
+#' * date_format A character vector specifying the custom date format(s) for the [lubridate::parse_date_time()] function
+#' (e.g., "%d.%m.%Y %H:%M:%S"). Multiple formats can be defined. The first matching format will be selected for parsing.
 #' * tz_offset - If source datetimes aren't in UTC, then is possible define offset from UTC in minutes.
 #' Value in this column have the highest priority. If NA then auto detection of timezone in files.
 #' If timezone can't be detected, then UTC is supposed.
@@ -147,6 +152,13 @@ mc_read_data <- function(files_table, localities_table=NULL, clean=TRUE, silent=
         files_table <- .read_edit_data_file_paths(files_table, source_csv_file)
     }
     files_table <- .common_convert_factors_in_dataframe(files_table)
+    files_table <- .read_check_data_file_paths(files_table)
+    .read_state$check_bar <- NULL
+    .read_state$read_bar <- NULL
+    if(!silent) {
+        .read_state$check_bar <- progress::progress_bar$new(format = "check [:bar] :current/:total files",
+                                                              total=nrow(files_table))
+    }
     if(nrow(files_table) == 0)
     {
         return(list())
@@ -167,6 +179,10 @@ mc_read_data <- function(files_table, localities_table=NULL, clean=TRUE, silent=
     data_formats <- data_formats[condition]
     if(nrow(files_table) == 0) {
         stop(.read_const_MESSAGE_ANY_FILE)
+    }
+    if(!silent) {
+        .read_state$read_bar <- progress::progress_bar$new(format = "read [:bar] :current/:total files",
+                                                           total=nrow(files_table))
     }
     files_table$serial_number <- .read_get_edited_serial_numbers(files_table, data_formats)
     files_table$locality_id <- .read_get_edited_locality_ids(files_table)
@@ -199,6 +215,15 @@ mc_read_data <- function(files_table, localities_table=NULL, clean=TRUE, silent=
     return(files_table)
 }
 
+.read_check_data_file_paths <- function(files_table) {
+    file_exists <- file.exists(as.character(files_table$path))
+    if(all(file_exists)) {
+        return(files_table)
+    }
+    purrr::walk(files_table$path[!file_exists], ~ warning(stringr::str_glue(.read_const_MESSAGE_FILE_SKIP)))
+    return(files_table[file_exists, ])
+}
+
 .read_init_localities_from_table <- function(localities_table) {
     result <- purrr::pmap(localities_table, .read_get_new_locality)
     names(result) <- localities_table$locality_id
@@ -223,9 +248,10 @@ mc_read_data <- function(files_table, localities_table=NULL, clean=TRUE, silent=
         }
         else {
             warning(stringr::str_glue(.read_const_MESSAGE_UNSUPPOERTED_FORMAT))
+            if(!is.null(.read_state$check_bar)) .read_state$check_bar$tick()
             return(NULL)
         }
-        if(is.na(data_format_object@date_format) && !is.na(date_format)) {
+        if(any(!is.na(date_format))) {
             data_format_object@date_format <- date_format
         }
         if(!is.na(tz_offset)) {
@@ -237,8 +263,10 @@ mc_read_data <- function(files_table, localities_table=NULL, clean=TRUE, silent=
         data_format_object <- .model_load_data_format_params_from_file(data_format_object, path)
         if(is.null(data_format_object)) {
             warning(stringr::str_glue(.read_const_MESSAGE_UNAPLICABLE_FORMAT))
+            if(!is.null(.read_state$check_bar)) .read_state$check_bar$tick()
             return(NULL)
         }
+        if(!is.null(.read_state$check_bar)) .read_state$check_bar$tick()
         return(data_format_object)
     }
 
@@ -299,7 +327,7 @@ mc_read_data <- function(files_table, localities_table=NULL, clean=TRUE, silent=
 }
 
 .read_get_output_data <- function(files_table, localities, data_formats) {
-    files_table$index <- 1:nrow(files_table)
+    files_table$index <- seq_len(nrow(files_table))
     groupped_files <- dplyr::group_by(files_table, .data$locality_id)
     locality_function <- function(.x, .y) {
         if(.y$locality_id %in% names(localities)) {
@@ -350,10 +378,11 @@ mc_read_data <- function(files_table, localities_table=NULL, clean=TRUE, silent=
     data_table <- .read_fix_decimal_separator_if_need(filename, data_format, data_table)
     datetime <- data_table[[data_format@date_column]]
     if(!lubridate::is.POSIXct(datetime)) {
-        datetime <- as.POSIXct(strptime(datetime, data_format@date_format, "UTC"))
+        datetime <- lubridate::parse_date_time(datetime, data_format@date_format, tz="UTC")
     }
     if(any(is.na(datetime))) {
         warning(stringr::str_glue(.read_const_MESSAGE_WRONG_DATETIME))
+        if(!is.null(.read_state$read_bar)) .read_state$read_bar$tick()
         return(NULL)
     }
     if(data_format@tz_offset != 0) {
@@ -361,18 +390,29 @@ mc_read_data <- function(files_table, localities_table=NULL, clean=TRUE, silent=
     }
     states <- .read_create_source_states(filename, datetime)
     sensors <- .read_get_sensors_from_data_format(data_table, data_format, datetime, states)
-    .read_get_new_logger(datetime, sensors, serial_number, data_format@logger_type, step)
+    result <- .read_get_new_logger(datetime, sensors, serial_number, data_format@logger_type, step)
+    if(!is.null(.read_state$read_bar)) .read_state$read_bar$tick()
+    return(result)
 }
 
 .read_get_data_from_file <- function(filename, data_format, nrows=Inf) {
     result <- vroom::vroom(filename,
                            col_names = FALSE,
                            col_types = data_format@col_types,
+                           col_select = if(is.na(data_format@col_types)) vroom::everything() else 1:stringr::str_length(data_format@col_types),
                            delim = data_format@separator,
                            skip = data_format@skip,
                            na = data_format@na_strings,
                            n_max = nrows,
-                           show_col_types = FALSE)
+                           show_col_types = FALSE,
+                           progress = FALSE)
+    problems <- data.frame()
+    if("spec_tbl_df" %in% class(result)){
+        problems <- vroom::problems(result)
+    }
+    if(nrow(problems) > 0) {
+        warning(stringr::str_glue(.read_const_MESSAGE_VROOM_WARNING))
+    }
     return(result)
 }
 

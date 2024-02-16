@@ -3,7 +3,7 @@
 .calc_const_MESSAGE_STEP_LONGER_DAY <- "Step {data$metadata@period} in data is too long. Maximal allowed step is day."
 .calc_const_MESSAGE_LOGGER_STEP_LONGER_DAY <- "Step in logger {logger$metadata@serial_number} is too long. Maximal allowed step is day. It is skipped."
 .calc_const_MESSAGE_WRONG_PHYSICAL_UNIT <- "Physical unit of {sensor_name} isn't {unit_name}."
-.calc_const_MESSAGE_OVERWRITE_SENSOR <- "Sensor {output_sensor} exists in locality {locality$metadata@locality_id}. It will be overwritten."
+.calc_const_MESSAGE_OVERWRITE_SENSOR <- "Sensor {output_sensor} exists in locality {item$metadata@locality_id}. It will be overwritten."
 .calc_const_MESSAGE_SENSOR_NOT_EXISTS_IN_LOCALITIES <- "Sensor doesn't exist in any locality."
 .calc_const_MESSAGE_UNKNONW_SIOLTYPE <- "Soiltype {soiltype_value} is unknown."
 .calc_const_MESSAGE_WRONG_SOILTYPE <- "Soiltype doesn't contain all a, b, c parameters."
@@ -112,7 +112,7 @@ mc_calc_snow <- function(data, sensor, output_sensor="snow", localities=NULL, ra
         return(item)
     }
     if(!is.null(sensor_physical) && !.model_is_physical(item$sensors[[sensor_name]]$metadata, sensor_physical)){
-        .calc_wrong_physical_error_function(sensor_name, sensor_physical)
+        .calc_wrong_physical_warning_function(sensor_name, sensor_physical)
     }
     .calc_warn_if_overwriting(item, output_sensor_name)
     height <- item$sensors[[sensor_name]]$metadata@height
@@ -133,8 +133,8 @@ mc_calc_snow <- function(data, sensor, output_sensor="snow", localities=NULL, ra
     result
 }
 
-.calc_wrong_physical_error_function <- function(sensor_name, unit_name) {
-    stop(stringr::str_glue(.calc_const_MESSAGE_WRONG_PHYSICAL_UNIT))
+.calc_wrong_physical_warning_function <- function(sensor_name, unit_name) {
+    warning(stringr::str_glue(.calc_const_MESSAGE_WRONG_PHYSICAL_UNIT))
 }
 
 .calc_warn_if_overwriting <- function(item, output_sensor) {
@@ -256,7 +256,7 @@ mc_calc_snow_agg <- function(data, snow_sensor="snow", localities=NULL, period=3
 #'
 #' Raw TMS moisture values can be converted to the soil volumetric water content with calibration curves. The function provides 
 #' several experimentally derived calibration curves which were developped at reference temperature. To account for the difference 
-#' between reference and actual temperature, the function use actual soil temperature values measured by TMS_T1 soil temperature 
+#' between reference and actual temperature, the function uses actual soil temperature values measured by TMS_T1 soil temperature 
 #' sensor.
 #'
 #' The default calibration curve is "universal", which was designed for mineral soils (see Kopecký et al. 2021). 
@@ -268,7 +268,7 @@ mc_calc_snow_agg <- function(data, snow_sensor="snow", localities=NULL, period=3
 #' universal, sand TMS1, loamy sand TMS1, silt loam TMS1. 
 #' For details see [mc_data_vwc_parameters].
 #'
-#' It is also possible to define new calibarion function with custom parameters `a`, `b` and `c`. These can be
+#' It is also possible to define a new calibarion function with custom parameters `a`, `b` and `c`. These can be
 #' derived e.g. from TOMST TMS Calibr utility after entering custom ratio of clay, silt, sand.
 #'
 #' **Warning:** TOMST TMS Calibr utility was developed for TMS3 series of TMS loggers, which have 
@@ -287,7 +287,7 @@ mc_calc_snow_agg <- function(data, snow_sensor="snow", localities=NULL, period=3
 #' @param output_sensor name of new virtual sensor with VWC values (default "VWC_moisture")
 #' @param soiltype Either character corresponding to one of `soiltype` from [mc_data_vwc_parameters]
 #' (default `"universal"`), or a list with parameters `a`, `b` and `c` provided 
-#' by the user - i.e.,`list(a=Value_1, b=Value_2, c=Value_3)`.
+#' by the user as a `list(a=Value_1, b=Value_2, c=Value_3)`.
 #' @param localities list of locality_ids used for calculation; if NULL then all localities are used (default NULL)
 #' @param ref_t (default `r mc_const_CALIB_MOIST_REF_T`)
 #' @param acor_t (default `r sprintf("%.14f", mc_const_CALIB_MOIST_ACOR_T)`) correction parameter for temperature drift
@@ -394,13 +394,13 @@ mc_calc_vwc <- function(data, moist_sensor=mc_const_SENSOR_TMS_moist,
         return(TRUE)
     }
     if(!.model_is_physical_moisture_raw(item$sensors[[moist_sensor]]$metadata)){
-        .calc_wrong_physical_error_function(moist_sensor, .model_const_PHYSICAL_moisture_raw)
+        .calc_wrong_physical_warning_function(moist_sensor, .model_const_PHYSICAL_moisture_raw)
     }
     if(!.calc_check_sensor_in_item(item, temp_sensor)){
         return(TRUE)
     }
     if(!.model_is_physical_T_C(item$sensors[[temp_sensor]]$metadata)){
-        .calc_wrong_physical_error_function(temp_sensor, .model_const_PHYSICAL_T_C)
+        .calc_wrong_physical_warning_function(temp_sensor, .model_const_PHYSICAL_T_C)
     }
     .calc_warn_if_overwriting(item, output_sensor)
     return(FALSE)
@@ -410,7 +410,7 @@ mc_calc_vwc <- function(data, moist_sensor=mc_const_SENSOR_TMS_moist,
                                  a, b, c, ref_t, acor_t, wcor_t, frozen2NA) {
     vwc <- a * raw_values^2 + b * raw_values + c
     dcor_t <- wcor_t - acor_t
-    tcor <- ifelse(is.na(temp_values), raw_values, raw_values + (temp_values - ref_t) * (acor_t + dcor_t * vwc))
+    tcor <- ifelse(is.na(temp_values), raw_values, raw_values + (ref_t - temp_values) * (acor_t + dcor_t * vwc))
     vwc_cor <- a * (tcor + cal_cor_factor + cal_cor_slope * vwc)^2 + b * (tcor + cal_cor_factor + cal_cor_slope * vwc) + c
     result <- pmin(pmax(vwc_cor, 0), 1)
     if(frozen2NA) {
@@ -422,18 +422,17 @@ mc_calc_vwc <- function(data, moist_sensor=mc_const_SENSOR_TMS_moist,
 #' Growing Degree Days
 #'
 #' @description
-#' This function creates new virtual sensor on the locality within myClim data object. The virtual sensor
-#' with values of GDD (Growing Degree Days) in degees Celsius . days, using original time step. see details
+#' This function creates a new virtual sensor for each locality within myClim data object. The new virtual sensor
+#' provides values of GDD (Growing Degree Days) in degees Celsius for each time step in the original timeseries.
 #'
 #' @details
 #' Function calculates growing degree days as follows:  GDD = max(0;(T - Tbase)) . period(days)
-#' The allowed time step length for GDD calculation is day and shorter.
-#' Function creates new virtual sensor with the same time step as input data.
-#' For shorter time steps than the day, the GDD value is the contribution
-#' of the interval to the growing degree day, supposing constant temperature over this period.
-#' Be careful while aggregating growing degree days to longer periods
-#' - only meaningful aggregation function is `sum`,
-#' but myClim let you apply anything see [myClim::mc_agg()].
+#' The maximum allowed time step length for GDD calculation is one day.
+#' Function creates a new virtual sensor with the same time step as input data.
+#' For shorter time steps than one day, the GDD value is the contribution
+#' of the interval to the growing degree day, assuming constant temperature over this period.
+#' Be careful while aggregating growing degree days to longer periods, because only meaningful aggregation function here is `sum`,
+#' but myClim let you apply any aggregation function see [myClim::mc_agg()].
 #'
 #' @template param_myClim_object_cleaned
 #' @param sensor name of temperature sensor used for GDD calculation e.g. TMS_T3 see `names(mc_data_sensors)`
@@ -504,7 +503,7 @@ mc_calc_gdd <- function(data, sensor, output_prefix="GDD", t_base=5, localities=
 #'
 #' @description
 #' This function creates a new virtual sensor on locality within the myClim data object.
-#' The virtual sensor hosts FDD Freezing Degree Days.
+#' The new virtual sensor provides FDD Freezing Degree Days.
 #'
 #' @details
 #' The allowed step length for FDD calculation is day and shorter.
@@ -606,11 +605,11 @@ mc_calc_cumsum <- function(data, sensors, output_suffix="_cumsum", localities=NU
     return(data)
 }
 
-#' Calibrating Tomst dendrometer values to micrometers
+#' Converting Tomst dendrometer values to micrometers
 #'
 #' @description
 #' This function creates a new virtual sensor on locality within the myClim data object.
-#' The virtual sensor hosts the values of the change in stem size converted from raw
+#' The virtual sensor provides the values of the change in stem size converted from raw
 #' Tomst units to micrometers. Note that newer versions of Tomst Lolly 
 #' software can directly convert raw Tomst units to micrometers.
 #'
@@ -745,13 +744,13 @@ mc_calc_vpd <- function(data, temp_sensor="HOBO_T", rh_sensor="HOBO_RH",
         return(TRUE)
     }
     if(!.model_is_physical_T_C(item$sensors[[temp_sensor]]$metadata)){
-        .calc_wrong_physical_error_function(temp_sensor, .model_const_PHYSICAL_T_C)
+        .calc_wrong_physical_warning_function(temp_sensor, .model_const_PHYSICAL_T_C)
     }
     if(!.calc_check_sensor_in_item(item, rh_sensor)){
         return(TRUE)
     }
     if(!.model_is_physical(item$sensors[[rh_sensor]]$metadata, .model_const_PHYSICAL_RH)){
-        .calc_wrong_physical_error_function(rh_sensor, .model_const_PHYSICAL_RH)
+        .calc_wrong_physical_warning_function(rh_sensor, .model_const_PHYSICAL_RH)
     }
     .calc_warn_if_overwriting(item, output_sensor)
     return(FALSE)

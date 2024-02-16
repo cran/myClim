@@ -5,7 +5,7 @@
 \alias{mc_data_heights}
 \title{Default heights of sensors}
 \format{
-An object of class \code{data.frame} with 13 rows and 4 columns.
+An object of class \code{data.frame} with 15 rows and 4 columns.
 }
 \usage{
 mc_data_heights
@@ -53,10 +53,16 @@ TOMST - TMS_L45
 \item TMS_moist = soil 30-44 cm
 }
 
-HOBO - HOBO
+HOBO - HOBO_U23-001A
 \itemize{
 \item HOBO_T = air 150 cm
 \item HOBO_RH = air 150 cm
+}
+
+HOBO - HOBO_U23-004
+\itemize{
+\item HOBO_T = air 2 cm
+\item HOBO_extT = soil 8 cm
 }
 }
 \seealso{

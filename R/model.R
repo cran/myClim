@@ -67,6 +67,9 @@ mc_const_SENSOR_HOBO_T <- "HOBO_T"
 #' Onset HOBO humidity sensor id
 #' @export
 mc_const_SENSOR_HOBO_RH <- "HOBO_RH"
+#' Onset HOBO external temperature sensor id
+#' @export
+mc_const_SENSOR_HOBO_EXTT <- "HOBO_extT"
 
 .model_const_WRONG_CALIBRATION_SENSOR_ID <- mc_const_SENSOR_TMS_moist
 
@@ -132,14 +135,16 @@ mc_const_SENSOR_logical <- .model_const_VALUE_TYPE_LOGICAL
 .model_const_LOGGER_TOMST_TMS_L45 <- "TMS_L45"
 .model_const_LOGGER_TOMST_THERMODATALOGGER <- "Thermo"
 .model_const_LOGGER_TOMST_DENDROMETER <- "Dendro"
-.model_const_LOGGER_HOBO <- "HOBO"
+.model_const_LOGGER_HOBO_U23_001A <- "HOBO_U23-001A"
+.model_const_LOGGER_HOBO_U23_004 <- "HOBO_U23-004"
 
 .model_logger_types <- list(
     .model_const_LOGGER_TOMST_TMS,
     .model_const_LOGGER_TOMST_TMS_L45,
     .model_const_LOGGER_TOMST_THERMODATALOGGER,
     .model_const_LOGGER_TOMST_DENDROMETER,
-    .model_const_LOGGER_HOBO
+    .model_const_LOGGER_HOBO_U23_001A,
+    .model_const_LOGGER_HOBO_U23_004
 )
 
 .model_const_DATA_FORMAT_TOMST <- "TOMST"
@@ -160,6 +165,9 @@ mc_const_SENSOR_logical <- .model_const_VALUE_TYPE_LOGICAL
 
 .model_const_FORMAT_RAW <- "raw"
 .model_const_FORMAT_AGG <- "agg"
+
+.model_const_HOBO_LOGGER_TYPE_SECONDARY_TITLES <- list("RH,? \\(?%\\)?", "Temp,? \\(?(.[CF])\\)?")
+names(.model_const_HOBO_LOGGER_TYPE_SECONDARY_TITLES) <- c(.model_const_LOGGER_HOBO_U23_001A, .model_const_LOGGER_HOBO_U23_004)
 
 #' Custom list for myClim object
 #'
@@ -214,6 +222,19 @@ print.myClimList <- function(x, ...) {
 `[.myClimList` <- function(x, ...) {
     x$localities <- `[`(x$localities, ...)
     return(x)
+}
+
+#' Length function for myClim object
+#'
+#' Function return number of localities.
+#'
+#' @param x myClim object see [myClim-package]
+#' @param ... other parameters from function length
+#' @export
+#' @examples
+#' length(mc_data_example_agg)
+length.myClimList <- function(x, ...) {
+    length(x$localities)
 }
 
 # classes ================================================================================
@@ -774,24 +795,11 @@ setMethod(
             return(NULL)
         }
         data <- .read_get_data_from_file(path, object, nrows = .model_const_COUNT_TEST_VALUES)
-        object@date_format <- .get_tomst_datetime_format(data, object@date_column)
         object <- .model_change_tomst_columns_and_logger_type(object, data)
         object <- .model_tomst_change_col_type(object, data)
         return(object)
     }
 )
-
-.get_tomst_datetime_format <- function(data, date_column){
-    if(stringr::str_detect(data[1, date_column], "\\d{4}\\.\\d{1,2}\\.\\d{1,2} \\d{1,2}:\\d{2}"))
-    {
-        return("%Y.%m.%d %H:%M")
-    }
-    if(stringr::str_detect(data[1, date_column], "\\d{1,2}\\.\\d{1,2}\\.\\d{4} \\d{1,2}:\\d{2}"))
-    {
-        return("%d.%m.%Y %H:%M")
-    }
-    return(NA_character_)
-}
 
 .model_change_tomst_columns_and_logger_type <- function(object, data){
     tm_columns <- list(4)
@@ -820,11 +828,15 @@ setMethod(
 }
 
 .model_tomst_change_col_type <- function(object, data) {
-    has_comma <- purrr::map_lgl(object@columns, ~ any(stringr::str_detect(data[[.x]], ","), na.rm=TRUE))
+    has_comma <- .model_is_comma_in_data(object, data)
     if(!any(has_comma)) {
         object@col_types <- "icinnniin"
     }
     return(object)
+}
+
+.model_is_comma_in_data <- function(object, data) {
+    return(purrr::map_lgl(object@columns, ~ any(stringr::str_detect(data[[.x]], ","), na.rm=TRUE)))
 }
 
 setMethod(
@@ -840,18 +852,19 @@ setMethod(
 )
 
 .model_change_tomst_join_columns_and_logger_type <- function(object, data){
-    tmj_columns <- list(5)
-    names(tmj_columns) <- mc_const_SENSOR_Thermo_T
+    thermoj_columns <- list(5)
+    names(thermoj_columns) <- mc_const_SENSOR_Thermo_T
     tmsj_columns <- list(5, 6, 7, 8, 9)
-    names(tmsj_columns) <- c(mc_const_SENSOR_TMS_T1, mc_const_SENSOR_TMS_T2,mc_const_SENSOR_TMS_T3,
-                             mc_const_SENSOR_TMS_moist, mc_const_SENSOR_VWC)
+    names(tmsj_columns) <- c(mc_const_SENSOR_TMS_T1, mc_const_SENSOR_TMS_T2, mc_const_SENSOR_TMS_T3,
+                            mc_const_SENSOR_TMS_moist, mc_const_SENSOR_VWC)
     is_T1_NA <- all(is.na(data[[tmsj_columns[[mc_const_SENSOR_TMS_T1]]]]))
     is_NA_T2_T3 <- all(is.na(data[[tmsj_columns[[mc_const_SENSOR_TMS_T2]]]])) &&
         all(is.na(data[[tmsj_columns[[mc_const_SENSOR_TMS_T3]]]]))
     is_T1_T2_T3_equals <- (all(data[[tmsj_columns[[mc_const_SENSOR_TMS_T1]]]] == data[[tmsj_columns[[mc_const_SENSOR_TMS_T2]]]]) &&
         all(data[[tmsj_columns[[mc_const_SENSOR_TMS_T1]]]] == data[[tmsj_columns[[mc_const_SENSOR_TMS_T3]]]]))
-    if(!is_T1_NA && (is_NA_T2_T3 || is_T1_T2_T3_equals)) {
-        object@columns <- tmj_columns
+    if((!is.na(object@logger_type) && object@logger_type == .model_const_LOGGER_TOMST_THERMODATALOGGER) ||
+        (!is_T1_NA && (is_NA_T2_T3 || is_T1_T2_T3_equals))) {
+        object@columns <- thermoj_columns
         if(is.na(object@logger_type)) {
             object@logger_type <- .model_const_LOGGER_TOMST_THERMODATALOGGER
         }
@@ -865,6 +878,7 @@ setMethod(
         object@columns <- tmsj_columns[names(tmsj_columns) != mc_const_SENSOR_VWC]
         return(object)
     }
+    object@col_types <- "icccdddid"
     object@columns <- tmsj_columns
     object
 }
@@ -880,7 +894,7 @@ setMethod(
             return(NULL)
         }
         object <- .model_hobo_set_skip(object, lines)
-        data <- .read_get_data_from_file(path, object, nrows = count_lines)
+        data <- .read_get_data_from_file(path, object, nrows = .model_const_COUNT_TEST_VALUES)
         object@skip <- object@skip + 1
         has_numbers_column <- data[[1]][[1]] == "#"
         object <- .model_hobo_set_date_column(object, data, has_numbers_column)
@@ -888,7 +902,9 @@ setMethod(
             return(NULL)
         }
         object <- .model_hobo_set_tz_offset(object, data)
-        object <- .model_hobo_set_columns(object, data, has_numbers_column)
+        object <- .model_hobo_set_columns_and_logger_type(object, data, has_numbers_column)
+        object <- .model_hobo_change_col_type(object, data)
+
         if(!.model_is_hobo_format_ok(object)) {
             return(NULL)
         }
@@ -957,11 +973,11 @@ setMethod(
     object
 }
 
-.model_hobo_set_columns <- function(object, data, has_numbers_column) {
+.model_hobo_set_columns_and_logger_type <- function(object, data, has_numbers_column) {
     col_types <- rep("c", ncol(data))
     add_count_columns <- if(has_numbers_column) 1 else 0
     temp_column <- 2 + add_count_columns
-    rh_column <- 3 + add_count_columns
+    secondary_column <- 3 + add_count_columns
     parts <- stringr::str_match(data[[temp_column]][[1]], "Temp,? \\(?(.[CF])\\)?")
     if(is.na(parts[[1, 2]])) {
         warning(.model_const_MESSAGE_COLUMNS_PROBLEM)
@@ -974,22 +990,47 @@ setMethod(
     columns <- list()
     columns[[temp_sensor_id]] <- temp_column
     col_types[[temp_column]] <- "d"
-    if(ncol(data) < rh_column){
-        object@columns <- columns
-        object@col_types <- paste0(col_types, collapse="")
-        return(object)
-    }
-    parts <- stringr::str_match(data[[rh_column]][[1]], "RH,? \\(?%\\)?")
-    if(is.na(parts[[1, 1]])) {
-        object@columns <- columns
-        object@col_types <- paste0(col_types, collapse="")
-        return(object)
-    }
-    columns[[mc_const_SENSOR_HOBO_RH]] <- rh_column
-    col_types[[rh_column]] <- "d"
     object@columns <- columns
     object@col_types <- paste0(col_types, collapse="")
-    object
+    if(ncol(data) < secondary_column){
+        return(object)
+    }
+
+    if(.model_is_logger_type_hobo(object, data, secondary_column, .model_const_LOGGER_HOBO_U23_001A)) {
+        columns[[mc_const_SENSOR_HOBO_RH]] <- secondary_column
+        col_types[[secondary_column]] <- "d"
+        object@logger_type  <- .model_const_LOGGER_HOBO_U23_001A
+    }
+    if(.model_is_logger_type_hobo(object, data, secondary_column, .model_const_LOGGER_HOBO_U23_004)) {
+        columns[[mc_const_SENSOR_HOBO_EXTT]] <- secondary_column
+        col_types[[secondary_column]] <- "d"
+        object@logger_type  <- .model_const_LOGGER_HOBO_U23_004
+    }
+
+    object@columns <- columns
+    object@col_types <- paste0(col_types, collapse="")
+    return(object)
+}
+
+.model_is_logger_type_hobo <- function(object, data, secondary_column, logger_type) {
+    if(!is.na(object@logger_type)) {
+        return(FALSE)
+    }
+    column_pattern <- .model_const_HOBO_LOGGER_TYPE_SECONDARY_TITLES[[logger_type]]
+    parts <- stringr::str_match(data[[secondary_column]][[1]], column_pattern)
+    return(!is.na(parts[[1, 1]]))
+}
+
+.model_hobo_change_col_type <- function(object, data) {
+    has_comma <- .model_is_comma_in_data(object, data[-1, ])
+    if(any(has_comma)) {
+        col_types <- strsplit(object@col_types, split="")[[1]]
+        for(i in object@columns) {
+            col_types[[i]] <- "c"
+        }
+        object@col_types <- paste0(col_types, collapse="")
+    }
+    return(object)
 }
 
 .model_is_hobo_format_ok <- function(object) {

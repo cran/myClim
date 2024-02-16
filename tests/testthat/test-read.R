@@ -28,6 +28,15 @@ test_that("mc_read_data csv without localities", {
     expect_equal(data$localities$A1E05$loggers[[2]]$metadata@serial_number, "94230002")
 })
 
+test_that("mc_read_data missed file", {
+    table <- read.csv("../data/TOMST/files_table2.csv")
+    expect_warning(data <- mc_read_data(table, clean=FALSE), "File data_94184103_0.csv does not exist - skipping.") %>%
+        expect_warning("File data_91184101_0.csv does not exist - skipping.") %>%
+        expect_warning("File data_94230002_2022_06_10_0.csv does not exist - skipping.")
+    test_raw_data_format(data)
+    expect_equal(length(data), 1)
+})
+
 test_that("mc_read_data TOMST format datetime", {
     table <- data.frame(path= "../data/format/201911_93164272.csv", locality_id="AAA",
                         data_format="TOMST", serial_number="93164272")
@@ -86,6 +95,8 @@ test_that("mc_read_data HOBO", {
         "../data/HOBO/20024354_separeted.csv", "H", "HOBO", "20024356", "%y.%m.%d", NA_integer_,
         "../data/HOBO/20024354_tab.txt", "CH", "HOBO", NA_character_, "%y.%m.%d %H:%M:%S", NA_integer_,
         "../data/HOBO/6265.csv", "I", "HOBO", NA_character_, "%m/%d/%y %I:%M:%S %p", NA_integer_,
+        "../data/HOBO/20024370.txt", "J", "HOBO", NA_character_, "%d.%m.%Y %H:%M:%S", NA_integer_,
+        "../data/HOBO/2015_10382557.txt", "K", "HOBO", NA_character_, "%d.%m.%Y %H:%M:%S", NA_integer_,
     ))
     not_applicable_format_warning(data <- mc_read_data(files_table, clean=FALSE)) %>%
         not_applicable_format_warning() %>%
@@ -93,7 +104,7 @@ test_that("mc_read_data HOBO", {
         expect_warning("Temperature data in °F is converted to °C.") %>%
         expect_warning("Separated time in source data isn't supported.")
     test_raw_data_format(data)
-    expect_equal(sort(names(data$localities)), sort(c("A", "B", "C", "D", "E", "F", "CH", "I")))
+    expect_equal(sort(names(data$localities)), sort(c("A", "B", "C", "D", "E", "F", "CH", "I", "J", "K")))
     expect_true(var(c(data$localities$A$loggers[[1]]$datetime[[1]],
                       data$localities$B$loggers[[1]]$datetime[[1]],
                       data$localities$C$loggers[[1]]$datetime[[1]],
@@ -109,6 +120,21 @@ test_that("mc_read_data HOBO", {
     clean_info <- mc_info_clean(cleaned_data)
     expect_true(all(clean_info$count_duplicities == 0))
     expect_true(all(clean_info$count_missing == 0))
+    expect_true(dplyr::near(data$localities$J$loggers[[1]]$sensors$HOBO_T$values[[1]], 7.87))
+    expect_true(dplyr::near(data$localities$J$loggers[[1]]$sensors$HOBO_RH$values[[1]], 100.0))
+    expect_true(all(c(data$localities$A$loggers[[1]]$metadata@type,
+                   data$localities$B$loggers[[1]]$metadata@type,
+                   data$localities$C$loggers[[1]]$metadata@type,
+                   data$localities$D$loggers[[1]]$metadata@type,
+                   data$localities$E$loggers[[1]]$metadata@type,
+                   data$localities$F$loggers[[1]]$metadata@type,
+                   data$localities$CH$loggers[[1]]$metadata@type,
+                   data$localities$J$loggers[[1]]$metadata@type) == .model_const_LOGGER_HOBO_U23_001A))
+    expect_true(is.na(data$localities$I$loggers[[1]]$metadata@type))
+    expect_true(data$localities$K$loggers[[1]]$metadata@type == .model_const_LOGGER_HOBO_U23_004)
+    expect_equal(length(data$localities$K$loggers[[1]]$sensors), 2)
+    expect_true(mc_const_SENSOR_HOBO_EXTT %in% names(data$localities$K$loggers[[1]]$sensors))
+    expect_true(data$localities$K$loggers[[1]]$sensors$HOBO_T$metadata@height == "air 2 cm")
 })
 
 test_that("mc_read_data HOBO skip wrong datetime", {
@@ -117,7 +143,8 @@ test_that("mc_read_data HOBO skip wrong datetime", {
         "../data/HOBO/20024354.txt", "A", "HOBO", NA_character_, "%d.%m.%Y %H:%M:%S", NA_integer_,
         "../data/HOBO/20024354_comma.csv", "B", "HOBO", NA_character_, "%m.%d.%Y %H:%M:%S", NA_integer_
     ))
-    expect_warning(data <- mc_read_data(files_table, clean=FALSE))
+    expect_warning(data <- mc_read_data(files_table, clean=FALSE)) %>%
+        expect_warning()
     test_raw_data_format(data)
     expect_equal(length(data$localities), 1)
 })
@@ -154,12 +181,21 @@ test_that("mc_read_files TOMST with error in data", {
 })
 
 test_that("mc_read_files joined TOMST direcory", {
-    data <- mc_read_files("../data/joined_TOMST", "TOMST_join", clean=FALSE)
+    data <- mc_read_files("../data/joined_TOMST", "TOMST_join", clean=FALSE, recursive=FALSE)
     test_raw_data_format(data)
-    expect_equal(names(data$localities), c("A1E01_TS", "A1W14_TMS", "A4E53_TMS", "CKras_Loc_2_15", "CZ2_HRADEC_TMS", "CZ2_HRADEC_TS"))
+    expect_equal(names(data$localities), c("202004_94199113", "202010_91183101", "A1E01_TS", "A1W14_TMS", "A4E53_TMS", "CKras_Loc_2_15",
+                                           "CZ2_HRADEC_TMS", "CZ2_HRADEC_TS", "DP_0595"))
     expect_equal(names(data$localities$A1W14_TMS$loggers[[1]]$sensors), c("TMS_T1", "TMS_T2", "TMS_T3", "TMS_moist"))
     expect_equal(names(data$localities$CZ2_HRADEC_TMS$loggers[[1]]$sensors), c("TMS_T1", "TMS_T2", "TMS_T3", "TMS_moist", "VWC"))
     expect_equal(names(data$localities$CZ2_HRADEC_TS$loggers[[1]]$sensors), "Thermo_T")
+})
+
+test_that("mc_read_files joined TOMST NA begin", {
+    data <- mc_read_files("../data/joined_TOMST/problems/202110_91201320.csv", "TOMST_join",
+                          logger_type="Thermo", silent=TRUE)
+    test_raw_data_format(data)
+    expect_equal(data$localities$`202110_91201320`$loggers[[1]]$metadata@type, "Thermo")
+    expect_equal(names(data$localities$`202110_91201320`$loggers[[1]]$sensors), "Thermo_T")
 })
 
 test_that("mc_read_wide", {
@@ -231,5 +267,12 @@ test_that("mc_read_files user_data_formats auto datetime", {
     test_raw_data_format(my_data)
     expect_equal(length(my_data$localities$TMS94184102$loggers[[1]]$sensors), 4)
     expect_equal(names(my_data$localities$TMS94184102$loggers[[1]]$sensors), c("T_C1", "T_C2", "T_C3", "real"))
+})
+
+test_that("mc_read_files TOMST custom date time format", {
+    expect_error(expect_warning(expect_warning(data <- mc_read_files("../data/TOMST-date", "TOMST"))))
+    data <- mc_read_files("../data/TOMST-date", "TOMST", date_format=c("%d.%m.%Y %H:%M:%S", "%d.%m.%Y"),
+                          silent=TRUE)
+    test_raw_data_format(data)
 })
 

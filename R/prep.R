@@ -20,6 +20,8 @@
 .prep_const_MESSAGE_VALUES_SAME_TIME <- "In logger {serial_number} are different values of {sensor_name} in same time."
 .prep_const_MESSAGE_STEP_PROBLEM <- "step cannot be detected for logger {logger$metadata@serial_number} - skip"
 
+.prep_state <- new.env()
+
 #' Cleaning datetime series
 #'
 #' @description
@@ -54,7 +56,7 @@
 #' (13:33 -> 14:00, 15:33 -> 16:00) than use `mc_agg(period="2 hours")` command after data cleaning.
 #'
 #' @template param_myClim_object_raw
-#' @param silent if true, then cleaning log table is not printed in console (default FALSE), see [myClim::mc_info_clean()]
+#' @param silent if true, then cleaning log table and progress bar is not printed in console (default FALSE), see [myClim::mc_info_clean()]
 #' @return
 #' * cleaned myClim object in Raw-format
 #' * cleaning log is by default printed in console, but can be called also later by [myClim::mc_info_clean()]
@@ -67,6 +69,12 @@ mc_prep_clean <- function(data, silent=FALSE) {
     }
     if(.prep_is_datetime_step_processed_in_object(data)) {
         warning(.prep_const_MESSAGE_RECLEAN)
+    }
+    count_table <- mc_info_count(data)
+    .prep_state$clean_bar <- NULL
+    if(!silent) {
+        .prep_state$clean_bar <- progress::progress_bar$new(format = "clean [:bar] :current/:total loggers",
+                                                            total=count_table$count[count_table$item == "loggers"])
     }
     locality_function <- function(locality) {
         locality$loggers <- purrr::map(locality$loggers, .prep_clean_logger)
@@ -99,6 +107,7 @@ mc_prep_clean <- function(data, silent=FALSE) {
     }
     if(is.na(logger$clean_info@step)) {
         warning(stringr::str_glue(.prep_const_MESSAGE_STEP_PROBLEM))
+        if(!is.null(.prep_state$clean_bar)) .prep_state$clean_bar$tick()
         return(logger)
     }
     new_datetime <- .prep_get_rounded_datetime(logger)
@@ -107,6 +116,7 @@ mc_prep_clean <- function(data, silent=FALSE) {
     logger <- .prep_clean_write_info(logger, rounded)
     logger <- .prep_clean_edit_series(logger)
     logger <- .prep_clean_edit_source_state(logger)
+    if(!is.null(.prep_state$clean_bar)) .prep_state$clean_bar$tick()
     logger
 }
 
@@ -421,15 +431,17 @@ mc_prep_meta_sensor <- function(data, values, param_name, localities=NULL, logge
 #' Set solar time offset against UTC time
 #'
 #' @description
-#' This function calculates the offset against UTC on the locality to get the solar time.
-#' This is based on coordinates (longitude). If longitude is not provided, then not working.
+#' This function calculates the temporal offset between local solar time and UTC time zone.
+#' Calculation is based on geographic coordinates of each locality. 
+#' Therefore, the function does not work when longitude coordinate is not provided.
 #'
 #' @details
-#' myClim library presumes the data in UTC by default. This function requires longitude to be provided in locality
-#' metadata slot `lon_wgs84` (in decimal degrees). Coordinates of locality can be provided
-#' during data reading, see [myClim::mc_read_data()], or ex post with [myClim::mc_prep_meta_locality()] function.
+#' myClim assumes that the data are in UTC. To calculate temporal offset based on local solar time, this function requires 
+#' geographic coordinates (at least longitude) to be provided in locality metadata slot `lon_wgs84` (in decimal degrees). 
+#' Geographic coordinates for each locality can be provided already during data reading, see [myClim::mc_read_data()], or added 
+#' later  with [myClim::mc_prep_meta_locality()] function.
 #'
-#' TZ offset in minutes is calculated as `longitude / 180 * 12 * 60`.
+#' TZ offset (in minutes) is calculated as `longitude / 180 * 12 * 60`.
 #'
 #' @template param_myClim_object
 #' @return myClim object in the same format as input, with `tz_offset` filled in locality metadata
@@ -1060,19 +1072,19 @@ mc_prep_TMSoffsoil <- function(data,
         return(TRUE)
     }
     if(!.model_is_physical_T_C(item$sensors[[soil_sensor]]$metadata)){
-        .calc_wrong_physical_error_function(soil_sensor, .model_const_PHYSICAL_T_C)
+        .calc_wrong_physical_warning_function(soil_sensor, .model_const_PHYSICAL_T_C)
     }
     if(!.calc_check_sensor_in_item(item, air_sensor)){
         return(TRUE)
     }
     if(!.model_is_physical_T_C(item$sensors[[air_sensor]]$metadata)){
-        .calc_wrong_physical_error_function(air_sensor, .model_const_PHYSICAL_T_C)
+        .calc_wrong_physical_warning_function(air_sensor, .model_const_PHYSICAL_T_C)
     }
     if(!.calc_check_sensor_in_item(item, moist_sensor)){
         return(TRUE)
     }
     if(!.model_is_physical(item$sensors[[moist_sensor]]$metadata, .model_const_PHYSICAL_moisture_raw)){
-        .calc_wrong_physical_error_function(moist_sensor, .model_const_PHYSICAL_moisture_raw)
+        .calc_wrong_physical_warning_function(moist_sensor, .model_const_PHYSICAL_moisture_raw)
     }
     .calc_warn_if_overwriting(item, output_sensor)
     return(FALSE)

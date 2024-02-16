@@ -76,7 +76,7 @@ mc_info_clean <- function(data) {
 #' * serial_number - serial number of logger when provided or automatically detected from file name or header
 #' * sensor_id - original sensor id (e.g.,"GDD", "HOBO_T" ,"TMS_T1", "TMS_T2")
 #' * sensor_name - original sensor id if not modified, if renamed then new name (e.g.,"GDD5", "HOBO_T_mean" ,"TMS_T1_max", "my_sensor01")
-#' * start_date - the oldest record on the sensor  
+#' * start_date - the oldest record on the sensor
 #' * end_date - the newest record on the sensor
 #' * step_seconds - time step of records series (seconds)
 #' * period - time step of records series (text)
@@ -169,4 +169,85 @@ mc_info_meta <- function(data) {
 
     result <- purrr::map_dfr(localities, locality_function)
     as.data.frame(result)
+}
+
+#' Get loggers info table
+#' 
+#' This function returns a data.frame with information about loggers. 
+#' 
+#' This function is designed to work only with
+#' myClim objects in **Raw-format**, where the loggers are organized at localities.
+#' In **Agg-format**, myClim objects do not support loggers; sensors are directly connected to the locality.
+#' See [myClim-package]. `mc_info_logger` does not work in Agg-format.
+#'
+#' @template param_myClim_object_raw
+#' @return A data.frame with the following columns:
+#' * locality_id - If provided by the user, it represents the locality ID; if not provided, it is identical to the logger's serial number.
+#' * index - Logger index at the locality.
+#' * serial_number - Serial number of the logger, either provided by the user or automatically detected from the file name or header.
+#' * logger_type - Logger type.
+#' * start_date - The oldest record on the logger.
+#' * end_date - The newest record on the logger.
+#' * step_seconds - Time step of the record series (in seconds).
+#' @export
+#' @examples
+#' mc_info_logger(mc_data_example_raw)
+mc_info_logger <- function(data) {
+    .common_stop_if_not_raw_format(data)
+
+    logger_function <- function(locality_id, logger_index, logger) {
+        step <- as.integer(logger$clean_info@step)
+
+        return(
+             list(locality_id=locality_id,
+                  index=logger_index,
+                  serial_number=logger$metadata@serial_number,
+                  logger_type=logger$metadata@type,
+                  start_date=min(logger$datetime),
+                  end_date=max(logger$datetime),
+                  step_seconds=step))
+    }
+
+    locality_function <- function(locality) {
+        purrr::pmap_dfr(list(
+                        locality_id = locality$metadata@locality_id,
+                        logger_index = seq_along(locality$loggers),
+                        logger = locality$loggers),
+                        logger_function)
+    }
+
+    result <- purrr::map_dfr(data$localities, locality_function)
+
+    as.data.frame(result)
+}
+
+#' Get joining info table
+#'
+#' This function returns a data.frame that contains information about the join operations.
+#' Although this function performs the join process, it only returns an overview table,
+#' not the actual joined data.
+#'
+#' This function is designed to work only with
+#' myClim objects in **Raw-format**, where the loggers are organized at localities.
+#' In **Agg-format**, myClim objects do not support loggers; sensors are directly connected to the locality.
+#' See [myClim-package]. `mc_info_join` does not work in Agg-format.
+#'
+#' @template param_myClim_object_raw
+#' @param comp_sensors parameter for [mc_join()] function (default NULL)
+#' @return A data.frame with the following columns:
+#' * locality_id - The ID of the locality.
+#' * count_loggers - Number of loggers before the join operation.
+#' * count_joined_loggers - Number of loggers after the join operation.
+#' * count_data_conflicts - Number of different values in overlapping sensors.
+#' * count_errors - Number of join-related errors. An error occurs when all sensors of the loggers have different names.
+#' @export
+mc_info_join <- function(data, comp_sensors=NULL) {
+    localities <- as.list(.join_main(data, comp_sensors, TRUE))
+    param_df <- purrr::map_dfr(localities, ~ .x)
+    result <- data.frame(locality_id=names(localities))
+    result[colnames(param_df)] <- param_df
+    for(colname in colnames(param_df)) {
+        result[[colname]] <- as.integer(result[[colname]])
+    }
+    return(result)
 }

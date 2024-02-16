@@ -3,7 +3,7 @@ source("libtest.R")
 test_that("mc_agg UTC", {
     data <- mc_read_files("../data/clean-datetime_step", "TOMST", clean=FALSE)
     expect_error(hour_data <- mc_agg(data, "percentile", "hour", use_utc = TRUE, percentiles = c(10, 50, 90), min_coverage = 0))
-    cleaned_data <- mc_prep_clean(data, silent=T)
+    expect_warning(cleaned_data <- mc_prep_clean(data, silent=T))
     hour_data <- mc_agg(cleaned_data, "percentile", "hour", use_utc = TRUE, percentiles = c(10, 50, 90), min_coverage = 0)
     test_agg_data_format(hour_data)
     expect_equal(length(hour_data$localities[["94184102"]]$sensors), 12)
@@ -256,12 +256,13 @@ test_that("mc_agg shifted series", {
 
 test_that("mc_agg custom functions", {
     data <- mc_read_files("../data/agg", "TOMST", silent=T)
-    custom_functions <- list(frost_days=function(values){min(values) < 5})
-    agg_data <- mc_agg(data, c("min", "frost_days"), "hour", custom_functions=custom_functions)
+    custom_functions <- list(frost_days=function(values){min(values) < 5}, first=function(values) {values[[1]]})
+    agg_data <- mc_agg(data, c("min", "frost_days", "first"), "hour", custom_functions=custom_functions)
     test_agg_data_format(agg_data)
     expect_equal(agg_data$localities$`91184101`$sensors$Thermo_T_min$values < 5,
                  agg_data$localities$`91184101`$sensors$Thermo_T_frost_days$values)
     expect_equal(agg_data$localities$`91184101`$sensors$Thermo_T_frost_days$metadata@sensor_id, mc_const_SENSOR_logical)
+    expect_equal(agg_data$localities$`91184101`$sensors$Thermo_T_first$metadata@sensor_id, mc_const_SENSOR_Thermo_T)
 })
 
 test_that("mc_agg min_coverage", {
