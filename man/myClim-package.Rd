@@ -20,7 +20,7 @@ like growing degree days, freezing degree days, snow cover duration,
 volumetric water content and vapor pressure deficit.
 
 Standardized microclimatic variables can be stored efficiently in myClim
-data format or easily exported to stadard R long or wide tables for further
+data format or easily exported to standard R long or wide tables for further
 analyses and visualization.
 
 \strong{myClim object}
@@ -90,6 +90,7 @@ $localities | locality[1]                                                       
             |           |             +---------------------------+                        ||
             |           |             | @type                     |                        ||
             |           |             | @serial_number            |                        ||
+            |           |             | @step                     |                        ||
             |           |             +---------------------------+                        ||
             |           |             +----------------------------+                       ||
             |           | $clean_info | mc_LoggerCleanInfo - class |                       ||

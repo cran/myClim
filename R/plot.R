@@ -4,6 +4,19 @@
 .plot_const_FACET_LOCALITY <- "locality"
 .plot_const_FACET_PHYSICAL <- "physical"
 
+.plot_const_PALETTE <- c(RColorBrewer::brewer.pal(9, "Set1"),
+                         RColorBrewer::brewer.pal(12, "Set3"),
+                         RColorBrewer::brewer.pal(8, "Set2"),
+                         RColorBrewer::brewer.pal(12, "Paired"),
+                         RColorBrewer::brewer.pal(8, "Dark2"),
+                         RColorBrewer::brewer.pal(8, "Accent"),
+                         RColorBrewer::brewer.pal(9, "Set1"),
+                         RColorBrewer::brewer.pal(12, "Set3"),
+                         RColorBrewer::brewer.pal(8, "Set2"),
+                         RColorBrewer::brewer.pal(12, "Paired"),
+                         RColorBrewer::brewer.pal(8, "Dark2"),
+                         RColorBrewer::brewer.pal(8, "Accent"))
+
 #' Plot data from loggers
 #'
 #' Function save separate files (*.png) per the loggers to the directory.
@@ -440,14 +453,15 @@ mc_plot_raster <- function(data, filename=NULL, sensors=NULL, by_hour=TRUE, png_
 #' @param end_crop POSIXct datetime in UTC for crop data (default NULL)
 #' @template param_use_utc
 #' @template param_localities
-#' @return ggplot2 object
-#' @param facet possible values (`NULL`, `"locality"`, `"physical"`) 
-#' 
+#' @param facet possible values (`NULL`, `"locality"`, `"physical"`)
+#'
 #' * `facet = "locality"` each locality is plotted (default)
 #' in separate plot in R and separate row in PDF if filename.pdf is provided. 
 #' * `facet = "physical"` sensors with  identical physical (see [mc_data_physical]) are grouped together across localities. 
-#' * `facet = NULL`, all localities and sensors (max 2 physicals, see details) are plotted
-#' in single plot
+#' * `facet = NULL`, all localities and sensors (max 2 physicals, see details) are plotted in single plot
+#' @param color_by_logger If TRUE, the color is assigned by logger to differentiate individual loggers (random colors)
+#' if false, the color is assigned by physical. (default FALSE)
+#' @return ggplot2 object
 #' @examples
 #' tms.plot <- mc_filter(mc_data_example_agg, localities = "A6W79")
 #' p <- mc_plot_line(tms.plot,sensors = c("TMS_T3","TMS_T1","TMS_moist"))
@@ -460,21 +474,24 @@ mc_plot_line <- function(data, filename=NULL, sensors=NULL,
                          png_width=1900, png_height=1900,
                          start_crop=NULL, end_crop=NULL, use_utc=TRUE,
                          localities=NULL,
-                         facet="locality") {
+                         facet="locality",
+                         color_by_logger=FALSE) {
     data <- mc_filter(data, localities=localities, sensors=sensors)
     if(!is.null(start_crop) || !is.null(end_crop)) {
         data <- mc_prep_crop(data, start_crop, end_crop)
     }
     sensors_table <- .plot_get_sensors_table(data, facet)
     sensors_table <- .plot_add_coeff_to_sensors_table(sensors_table, scale_coeff, facet)
-    data_table <- mc_reshape_long(data, use_utc=use_utc)
-    change_colors <- (is.null(facet) || facet != .plot_const_FACET_LOCALITY) && length(data$localities) > 1
+    data_table <- .plot_reshape_long(data, use_utc=use_utc)
+    change_colors <- .plot_get_change_colors(data, data_table, facet, color_by_logger)
     data_table <- .plot_line_edit_data_table(data_table, sensors_table, change_colors, facet)
 
     plot <- ggplot2::ggplot(data=data_table, ggplot2::aes(x=.data$datetime, y=.data$value_coeff, group=.data$series_name)) +
             ggplot2::geom_line(ggplot2::aes(color=.data$series_name))
     if(!change_colors) {
         plot <- plot + ggplot2::scale_color_manual(values=sensors_table$color)
+    } else {
+        plot <- plot + ggplot2::scale_color_manual(values=.plot_const_PALETTE)
     }
     plot <- plot + .plot_set_ggplot_line_theme()
     plot <- plot + .plot_line_set_y_axes(sensors_table)
@@ -590,10 +607,14 @@ mc_plot_line <- function(data, filename=NULL, sensors=NULL,
     } else {
         data_table$series_name <- data_table$sensor_name
     }
+    if(any(data_table$logger_index != 1)) {
+        data_table$series_name <- paste0(data_table$series_name, " (", data_table$logger_index, ")")
+    }
+
     coeff_list <- as.list(sensors_table$coeff)
     names(coeff_list) <- sensors_table$sensor
     coeff_env <- list2env(coeff_list)
-    data_table$value_coeff <- purrr::map2_dbl(data_table$sensor, data_table$value, ~ .y * coeff_env[[.x]])
+    data_table$value_coeff <- purrr::map2_dbl(data_table$sensor_name, data_table$value, ~ .y * coeff_env[[.x]])
     if(!is.null(facet) && facet == .plot_const_FACET_PHYSICAL)
     {
         join_table <- dplyr::select(sensors_table, "sensor", "physical")
@@ -667,4 +688,52 @@ mc_plot_line <- function(data, filename=NULL, sensors=NULL,
         ggplot2::facet_grid(rows = ggplot2::vars(.data$sensor))
     p <- plotly::ggplotly(p)
     print(p)
+}
+
+.plot_reshape_long <- function(data, use_utc=TRUE) {
+    is_raw_format <- .common_is_raw_format(data)
+
+    sensor_function <- function(locality_id, logger_index, sensor_item, datetime) {
+        count <- length(datetime)
+        tibble::tibble(locality_id=rep(locality_id, count),
+                       logger_index=rep(logger_index, count),
+                       sensor_name=rep(sensor_item$metadata@name, count),
+                       datetime=datetime,
+                       value=sensor_item$values)
+    }
+
+    sensors_item_function <- function(locality_id, logger_index, tz_offset, item) {
+        tz_offset <- if(use_utc) 0 else tz_offset
+        datetime <- .calc_get_datetimes_with_offset(item$datetime, tz_offset)
+        tables <- purrr::pmap_dfr(list(locality_id=locality_id, logger_index=logger_index,
+                                       sensor_item=item$sensors, datetime=list(datetime)),
+                                  sensor_function)
+    }
+
+    raw_locality_function <- function(locality) {
+        purrr::pmap_dfr(list(locality_id=locality$metadata@locality_id,
+                             logger_index=seq_along(locality$loggers),
+                             tz_offset=locality$metadata@tz_offset,
+                             item=locality$loggers), sensors_item_function)
+    }
+
+    if(is_raw_format) {
+        result <- purrr::map_dfr(data$localities, raw_locality_function)
+    } else {
+        result <- purrr::pmap_dfr(list(locality_id=names(data$localities),
+                                       logger_index=1,
+                                       tz_offset=purrr::map(data$localities, ~ .x$metadata@tz_offset),
+                                       item=data$localities), sensors_item_function)
+    }
+    return(result)
+}
+
+.plot_get_change_colors <- function(data, data_table, facet, color_by_logger) {
+    if(any(data_table$logger_index != 1) && color_by_logger) {
+        return(TRUE)
+    }
+    if(is.null(facet) || facet != .plot_const_FACET_LOCALITY) {
+        return(length(data$localities) > 1)
+    }
+    return(FALSE)
 }

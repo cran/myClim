@@ -1,3 +1,29 @@
+# myClim 1.2.0
+* The color palette of `mc_plot_line` function has been extended.
+
+# myClim 1.1.6
+* New function `mc_states_replace` has been added.
+
+# myClim 1.1.5
+* Updated the color palette of `mc_plot_line` for greater differentiation between values.
+
+# myClim 1.1.4
+* Fixed the issue with the joined series of loggers in the `mc_plot_line` function.
+* Added a new parameter `color_by_logger` to the `mc_plot_line` function.
+* Added a new parameter `logger_types` to the `mc_filter` function.
+
+# myClim 1.1.3
+* Fixed reading of TOMST Thermologger data CSV. The data format has changed in the new version of Lolly.
+
+# myClim 1.1.2
+* The `mc_prep_clean` function now selects a conflicted value based on the best match with the new rounded date and time.
+* A new parameter, `resolve_conflicts`, has been added to the `mc_prep_clean` function to allow checking uncleaned data.
+* Fixed the round-off issue of datetimes in states when an unconventional step is used.
+ 
+# myClim 1.1.1
+* New functions `mc_info_states`, `mc_states_insert`, `mc_states_update`, and `mc_states_delete` have been added.
+* The `mc_agg` function now rounds states by period.
+
 # myClim 1.1.0
 * Fixed an issue with the read progress bar when some files were skipped.
 * Changed the logger type `HOBO` to `HOBO_U23-001A`.

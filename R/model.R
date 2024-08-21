@@ -153,6 +153,7 @@ mc_const_SENSOR_logical <- .model_const_VALUE_TYPE_LOGICAL
 
 .model_const_SENSOR_STATE_SOURCE <- "source"
 .model_const_SENSOR_STATE_ERROR <- "error"
+.model_const_SENSOR_STATE_CONFLICT <- "conflict"
 
 .model_const_MESSAGE_NO_DATA <- "There aren't any data in source file."
 .model_const_MESSAGE_SEPARATED_TIME <- "Separated time in source data isn't supported."
@@ -810,7 +811,8 @@ setMethod(
     names(tms_columns) <- c(mc_const_SENSOR_TMS_T1, mc_const_SENSOR_TMS_T2, mc_const_SENSOR_TMS_T3,
                             mc_const_SENSOR_TMS_moist)
     if(all(is.na(data[[tms_columns[[mc_const_SENSOR_TMS_T2]]]]))) {
-        if(all(data[[dendro_columns[[mc_const_SENSOR_Dendro_raw]]]] == .model_const_TOMST_THERMODATALOGGER_VALUE)) {
+        if(all(is.na(data[[dendro_columns[[mc_const_SENSOR_Dendro_raw]]]])) ||
+           all(data[[dendro_columns[[mc_const_SENSOR_Dendro_raw]]]] == .model_const_TOMST_THERMODATALOGGER_VALUE)) {
             object@columns <- tm_columns
             logger_type <- .model_const_LOGGER_TOMST_THERMODATALOGGER
         } else {
