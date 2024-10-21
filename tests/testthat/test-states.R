@@ -214,3 +214,108 @@ test_that("mc_states_replace", {
     expect_equal(replaced_data_agg$localities$A2E32$sensors$TMS_T1$values[c(1:7, 13:75)],
                  data_agg$localities$A2E32$sensors$TMS_T1$values[c(1:7, 13:75)])
 })
+
+test_that("mc_states_from_sensor", {
+    cleaned_data <- mc_read_files("../data/eco-snow", "TOMST", silent=T)
+    # raw data
+    snow_raw_data <- mc_calc_snow(cleaned_data, "TMS_T2", output_sensor="T2_snow")
+    expect_error(data_with_states <- mc_states_from_sensor(snow_raw_data, "TMS_T2", "snow", "TMS_T2", "test value"))
+    data_with_states <- mc_states_from_sensor(snow_raw_data, "T2_snow", "snow", c("TMS_T2", "TMS_moist"), "test value")
+    test_raw_data_format(data_with_states)
+    states_table <- mc_info_states(data_with_states)
+    states_table <- dplyr::filter(states_table, .data$tag == "snow")
+    expect_equal(nrow(states_table), 8)
+    expect_true(all(states_table$value == "test value"))
+    # agg data
+    snow_agg_data <- mc_agg(snow_raw_data, fun=list(TMS_T2="max", T2_snow="max"), period="day")
+    agg_data_with_states <- mc_states_from_sensor(snow_agg_data, "T2_snow_max", "snow", "TMS_T2_max", inverse = 2)
+    test_agg_data_format(agg_data_with_states)
+    states_table <- mc_info_states(agg_data_with_states)
+    states_table <- dplyr::filter(states_table, .data$tag == "snow")
+    expect_equal(nrow(states_table), 3)
+    expect_equal(states_table$start[[1]], agg_data_with_states$localities[["94184102"]]$datetime[[1]])
+    snow_agg_data$localities[["94184102"]]$sensors$T2_snow_max$values[10:12] <- NA
+    agg_data_with_states <- mc_states_from_sensor(snow_agg_data, "T2_snow_max", "snow", "TMS_T2_max")
+    test_agg_data_format(agg_data_with_states)
+    states_table <- mc_info_states(agg_data_with_states)
+    states_table <- dplyr::filter(states_table, .data$tag == "snow")
+    expect_equal(nrow(states_table), 3)
+})
+
+test_that("mc_states_to_sensor", {
+    data <- mc_read_data("../data/TOMST/files_table.csv", silent=TRUE)
+    states <- as.data.frame(tibble::tribble(
+        ~locality_id, ~logger_index, ~sensor_name,    ~tag,
+        ~start,                                 ~end,
+        "A2E32"     ,              1,    "TMS_T1", "error",
+        lubridate::ymd_hm("2020-10-16 7:00"), lubridate::ymd_hm("2020-10-16 8:00"),
+        "A2E32"     ,              1,    "TMS_T1", "error",
+        lubridate::ymd_hm("2020-10-16 9:00"), lubridate::ymd_hm("2020-10-16 10:00"),
+        "A2E32"     ,              1,    "TMS_T2", "error",
+        lubridate::ymd_hm("2020-10-16 7:30"), lubridate::ymd_hm("2020-10-16 8:30"),
+    ))
+    states_data <- mc_states_insert(data, states)
+    data_new_sensor <- mc_states_to_sensor(states_data, "error", "TMS_T1_error", "TMS_T1")
+    test_raw_data_format(data_new_sensor)
+    t1_error_expected_values <- c(rep(FALSE, 3), rep(TRUE, 5), rep(FALSE, 3), rep(TRUE, 5), rep(FALSE, 75-16))
+    expect_equal(data_new_sensor$localities$A2E32$loggers[[1]]$sensors$TMS_T1_error$values, t1_error_expected_values)
+    expect_error(data_new_sensor <- mc_states_to_sensor(states_data, "error", c("TMS_T1_error", "TMS_T2_error"), "TMS_T1"))
+    data_new_sensor <- mc_states_to_sensor(states_data, "error", c("TMS_T1_error", "TMS_T2_error"), c("TMS_T1", "TMS_T2"))
+    test_raw_data_format(data_new_sensor)
+    t2_error_expected_values <- c(rep(FALSE, 5), rep(TRUE, 5), rep(FALSE, 75-10))
+    expect_equal(data_new_sensor$localities$A2E32$loggers[[1]]$sensors$TMS_T1_error$values, t1_error_expected_values)
+    expect_equal(data_new_sensor$localities$A2E32$loggers[[1]]$sensors$TMS_T2_error$values, t2_error_expected_values)
+    data_new_sensor <- mc_states_to_sensor(states_data, "error", "TMS_error", inverse = TRUE)
+    test_raw_data_format(data_new_sensor)
+    expect_equal(data_new_sensor$localities$A2E32$loggers[[1]]$sensors$TMS_error$values, !(t1_error_expected_values | t2_error_expected_values))
+    agg_states_data <- mc_agg(states_data)
+    agg_data_new_sensor <- mc_states_to_sensor(agg_states_data, "error", "TMS_T1_error", "TMS_T1")
+    test_agg_data_format(agg_data_new_sensor)
+    expect_equal(agg_data_new_sensor$localities$A2E32$sensors$TMS_T1_error$values, t1_error_expected_values)
+})
+
+test_that("mc_states_outlier", {
+    data <- mc_read_files("../data/TMSoffsoil/data_93142760_201904.csv", "TOMST", clean=F)
+    range_table <- mc_info_range(data)
+    range_table$min_value <- -3.5
+    expect_error(states_data <- mc_states_outlier(data, range_table))
+    data <- mc_prep_clean(data, silent=TRUE)
+    range_table$negative_jump[range_table$sensor_name == "TMS_moist"] <- -500
+    expect_error(states_data <- mc_states_outlier(data, range_table))
+    range_table$negative_jump[range_table$sensor_name == "TMS_moist"] <- 500
+    states_data <- mc_states_outlier(data, range_table)
+    test_raw_data_format(states_data)
+    states_table <- mc_info_states(states_data)
+    states_table <- dplyr::filter(states_table, .data$tag != "source")
+    expect_equal(nrow(states_table), 3)
+    expect_true("range" %in% states_table$tag)
+    expect_true("jump" %in% states_table$tag)
+    range_table$negative_jump[range_table$sensor_name == "TMS_moist"] <- 2000
+    range_table$positive_jump[range_table$sensor_name == "TMS_moist"] <- 1200
+    states_data <- mc_states_outlier(data, range_table, period="1 hour", range_tag="too_cold", jump_tag="my_jump")
+    test_raw_data_format(states_data)
+    states_table <- mc_info_states(states_data)
+    states_table <- dplyr::filter(states_table, .data$tag != "source")
+    expect_equal(nrow(states_table), 9)
+    expect_equal(nrow(dplyr::filter(states_table, tag == "my_jump")), 7)
+    expect_true("too_cold" %in% states_table$tag)
+    range_table <- mc_info_range(data)
+    range_table$positive_jump[range_table$sensor_name == "TMS_moist"] <- 300
+    states_data <- mc_states_outlier(data, range_table, jump_tag="rainy")
+    test_raw_data_format(states_data)
+    states_table <- mc_info_states(states_data)
+    states_table <- dplyr::filter(states_table, .data$tag != "source")
+    expect_equal(nrow(states_table), 6)
+    expect_true(all("rainy" == states_table$tag))
+    agg_data <- mc_agg(data, fun="mean", period="1 hour")
+    range_table <- mc_info_range(agg_data)
+    range_table$min_value <- -3.5
+    range_table$negative_jump[range_table$sensor_name == "TMS_moist_mean"] <- 500
+    states_agg_data <- mc_states_outlier(agg_data, range_table)
+    test_agg_data_format(states_agg_data)
+    states_agg_table <- mc_info_states(states_agg_data)
+    states_agg_table <- dplyr::filter(states_agg_table, .data$tag != "source")
+    expect_equal(nrow(states_agg_table), 3)
+    expect_true("range" %in% states_agg_table$tag)
+    expect_true("jump" %in% states_agg_table$tag)
+})

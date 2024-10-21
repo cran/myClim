@@ -1,3 +1,24 @@
+# myClim 1.3.0
+* Published on CRAN.
+
+# myClim 1.2.6
+* New functions `mc_info_range` and `mc_states_outlier` have been added.
+
+# myClim 1.2.5
+* The issue with the HOBO `logger_type` in the `mc_read_data` function has been fixed.
+
+# myClim 1.2.4
+* The multiple custom date formats issue for HOBO logger in the `mc_read_data` function has been fixed.
+
+# myClim 1.2.3
+* It is possible to define multiple custom date formats in the `mc_read_data` function.
+
+# myClim 1.2.2
+* The issue in the `mc_join` function with the `use always newer logger` option has been fixed.
+
+# myClim 1.2.1
+* The new functions `mc_states_from_sensor` and `mc_states_to_sensor` have been added.
+
 # myClim 1.2.0
 * The color palette of `mc_plot_line` function has been extended.
 
