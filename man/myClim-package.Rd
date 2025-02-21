@@ -80,6 +80,7 @@ $localities | locality[1]                                                       
             |           | @lon_wgs84                  |                                     |
             |           | @tz_offset                  |                                     |
             |           | @tz_type                    |                                     |
+            |           | @join_serial                |                                     |
             |           | @user_data                  |                                     |
             |           +-----------------------------+                                     |
             |           +------------------------------------------------------------------+|
@@ -89,6 +90,7 @@ $localities | locality[1]                                                       
             |           | $metadata   | mc_LoggerMetadata - class |                        ||
             |           |             +---------------------------+                        ||
             |           |             | @type                     |                        ||
+            |           |             | @name                     |                        ||
             |           |             | @serial_number            |                        ||
             |           |             | @step                     |                        ||
             |           |             +---------------------------+                        ||
@@ -175,6 +177,7 @@ $localities | locality[1]                                                     |
             |            | @lon_wgs84                  |                      |
             |            | @tz_offset                  |                      |
             |            | @tz_type                    |                      |
+            |            | @join_serial                |                      |
             |            | @user_data                  |                      |
             |            +-----------------------------+                      |
             | $datetime  POSIXct vector                                       |

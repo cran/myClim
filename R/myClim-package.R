@@ -76,6 +76,7 @@ if(getRversion() >= "2.15.1")  globalVariables(c(".data"))
 #'             |           | @lon_wgs84                  |                                     |
 #'             |           | @tz_offset                  |                                     |
 #'             |           | @tz_type                    |                                     |
+#'             |           | @join_serial                |                                     |
 #'             |           | @user_data                  |                                     |
 #'             |           +-----------------------------+                                     |
 #'             |           +------------------------------------------------------------------+|
@@ -85,6 +86,7 @@ if(getRversion() >= "2.15.1")  globalVariables(c(".data"))
 #'             |           | $metadata   | mc_LoggerMetadata - class |                        ||
 #'             |           |             +---------------------------+                        ||
 #'             |           |             | @type                     |                        ||
+#'             |           |             | @name                     |                        ||
 #'             |           |             | @serial_number            |                        ||
 #'             |           |             | @step                     |                        ||
 #'             |           |             +---------------------------+                        ||
@@ -173,6 +175,7 @@ if(getRversion() >= "2.15.1")  globalVariables(c(".data"))
 #'             |            | @lon_wgs84                  |                      |
 #'             |            | @tz_offset                  |                      |
 #'             |            | @tz_type                    |                      |
+#'             |            | @join_serial                |                      |
 #'             |            | @user_data                  |                      |
 #'             |            +-----------------------------+                      |
 #'             | $datetime  POSIXct vector                                       |

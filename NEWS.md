@@ -1,3 +1,60 @@
+# myClim 1.4.0
+* The save localities unit test has been fixed.
+* CRAN version.
+
+# myClim 1.3.11
+* The numbers in the `TOMS_join` format can be in scientific notation.
+
+# myClim 1.3.10
+* The environment `mc_read_problems` with vroom parse problems has been added.
+
+# myClim 1.3.9
+* The `clean_conflict` states issue in the `mc_prep_clean` function has been fixed.
+* The `NA` values in the `mc_prep_TMSoffsoil` function have been fixed.
+
+# myClim 1.3.8
+* The `tag` parameter has been added to the `mc_plot_line` function.
+
+# myClim 1.3.7
+* The uninitialsed date_format warning in the `mc_read_data` function has been fixed. 
+* The `cropt_table` parameter has been added to the `mc_prep_crop` function.
+* The `start` and `end` parameters in the `mc_prep_crop` function can be only single value.
+* The `crop_margins_NA` parameter has been added to the `mc_states_replace` function.
+
+# myClim 1.3.6
+* A new function `mc_save_localities` has been added.
+* The function `mc_load` can load multiple files.
+* The function `mc_load` can load all .RDS files in a directory.
+* The warnings about missing sensors have been removed.
+
+# myClim 1.3.5
+* The `logger_name` is used in the `mc_states_join` function instead of the `logger_index` as value in the states table.
+* The result of `mc_prep_TMSoffsoil` function has been changed to `TRUE`/`FALSE` instead of `1`/`0`.
+
+# myClim 1.3.4
+* The `logger_name` is used in myClim object instead of the `logger_index`.
+* The `logger_name` is visible in `mc_plot_line`.
+* The `show_logger_name` parameter has been added to the `mc_reshape_wide` function.
+* The `serias_name` label changed to `series` in `mc_plot_line`.
+* The progress bar is added to `mc_prep_crop`.
+* The `mc_prep_clean` step warning is fixed.
+
+# myClim 1.3.3
+* A performance issue in the `mc_prep_crop` function has been fixed.
+* The parameters `tolerance` and `by_type` have been added to the `mc_join` function.
+* The class `mc_LocalityMetadata` has been extended with the `join_serial` slot.
+* The new function `mc_states_join` has been added.
+* The function `mc_info_join` has been deleted.
+
+# myClim 1.3.2
+* The parameter `tolerance` has been added to the `mc_prep_clean` function.
+* The result table of the `mc_info_clean` function has been extended with the `logger_index` column.
+* The plot colors of sensors have been updated.
+* The colors issue in the `mc_plot_line` function has been fixed.
+
+# myClim 1.3.1
+* The conflict state issue in the `mc_prep_clean` function has been fixed.
+
 # myClim 1.3.0
 * Published on CRAN.
 

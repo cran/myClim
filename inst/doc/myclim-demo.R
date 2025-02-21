@@ -1,15 +1,15 @@
 ## ----eval=FALSE,include=FALSE,comment='',purl=TRUE----------------------------
-#  
-#  # === First install dependencies ===
-#  requiered_packages <- c("stringr", "lubridate", "tibble", "dplyr", "purrr",
-#                          "ggplot2", "ggforce", "viridis", "data.table", "rmarkdown",
-#                          "knitr", "kableExtra", "tidyr", "plotly", "zoo", "vroom")
-#  missing_packages <- requiered_packages[!(requiered_packages %in% installed.packages()[,"Package"])]
-#  if(length(missing_packages)) install.packages(missing_packages)
-#  
-#  # === Install myClim ===
-#  install.packages("http://labgis.ibot.cas.cz/myclim/myClim_latest.tar.gz", repos=NULL, build_vignettes=TRUE)
-#  
+# 
+# # === First install dependencies ===
+# requiered_packages <- c("stringr", "lubridate", "tibble", "dplyr", "purrr",
+#                         "ggplot2", "ggforce", "viridis", "data.table", "rmarkdown",
+#                         "knitr", "kableExtra", "tidyr", "plotly", "zoo", "vroom")
+# missing_packages <- requiered_packages[!(requiered_packages %in% installed.packages()[,"Package"])]
+# if(length(missing_packages)) install.packages(missing_packages)
+# 
+# # === Install myClim ===
+# install.packages("http://labgis.ibot.cas.cz/myclim/myClim_latest.tar.gz", repos=NULL, build_vignettes=TRUE)
+# 
 
 ## ----eval=TRUE,warning=FALSE--------------------------------------------------
 library(myClim)
@@ -78,9 +78,9 @@ tms <- mc_prep_calib(tms.load, sensors = c("TM_T",
                                            "TMS_T3"))
 
 ## ----eval=FALSE,error=FALSE,warning=FALSE-------------------------------------
-#  mc_info_count(tms)
-#  mc_info_clean(tms)
-#  mc_info(tms)
+# mc_info_count(tms)
+# mc_info_clean(tms)
+# mc_info(tms)
 
 ## ----eval=TRUE----------------------------------------------------------------
 
@@ -128,49 +128,49 @@ tms.usertz <- mc_prep_meta_locality(tms,
 
 
 ## ----eval=FALSE,comment = ''--------------------------------------------------
-#  
-#  # one locality with two downloads in time
-#  data <- mc_load("join_example.rds")
-#  
-#  joined_data <- mc_join(data, comp_sensors = c("TMS_T1", "TMS_T2"))
-#  
-#  #> Locality: 94184102
-#  #> Problematic interval: 2020-12-01 00:00:00 UTC--2020-12-31 23:45:00 UTC
-#  #>
-#  #> Older logger TMS 94184102
-#  #> start                 end
-#  #> 2020-10-06 09:15:00   2020-12-31 23:45:00
-#  #>
-#  #> Newer logger TMS 94184102
-#  #> start                end
-#  #> 2020-12-01 00:00:00  2021-04-07 11:45:00
-#  #>
-#  #> Loggers are different. They cannot be joined automatically.
-#  #>
-#  #> 1: use older logger
-#  #> 2: use newer logger
-#  #> 3: use always older logger
-#  #> 4: use always newer logger
-#  #> 5: exit
-#  #>
-#  #> Write choice number or start datetime of use newer
-#  #> logger in format YYYY-MM-DD hh:mm.
+# 
+# # one locality with two downloads in time
+# data <- mc_load("join_example.rds")
+# 
+# joined_data <- mc_join(data, comp_sensors = c("TMS_T1", "TMS_T2"))
+# 
+# #> Locality: 94184102
+# #> Problematic interval: 2020-12-01 00:00:00 UTC--2020-12-31 23:45:00 UTC
+# #>
+# #> Older logger TMS 94184102
+# #> start                 end
+# #> 2020-10-06 09:15:00   2020-12-31 23:45:00
+# #>
+# #> Newer logger TMS 94184102
+# #> start                end
+# #> 2020-12-01 00:00:00  2021-04-07 11:45:00
+# #>
+# #> Loggers are different. They cannot be joined automatically.
+# #>
+# #> 1: use older logger
+# #> 2: use newer logger
+# #> 3: use always older logger
+# #> 4: use always newer logger
+# #> 5: exit
+# #>
+# #> Write choice number or start datetime of use newer
+# #> logger in format YYYY-MM-DD hh:mm.
 
 ## ----eval=FALSE,comment = ''--------------------------------------------------
-#  ## lines
-#  tms.plot <- mc_filter(tms, localities = "A6W79")
-#  
-#  p <- mc_plot_line(tms.plot, sensors = c("TMS_T3", "TMS_T1", "TMS_moist"))
-#  p <- p+ggplot2::scale_x_datetime(date_breaks = "1 week", date_labels = "%W")
-#  p <- p+ggplot2::xlab("week")
-#  p <- p+ggplot2::aes(size = sensor_name)
-#  p <- p+ggplot2::scale_size_manual(values = c(1, 1 ,2))
-#  p <- p+ggplot2::guides(size = "none")
-#  p <- p+ggplot2::scale_color_manual(values = c("hotpink", "pink", "darkblue"), name = NULL)
-#  
-#  ## raster
-#  mc_plot_raster(tms, sensors = c("TMS_T3"))
-#  
+# ## lines
+# tms.plot <- mc_filter(tms, localities = "A6W79")
+# 
+# p <- mc_plot_line(tms.plot, sensors = c("TMS_T3", "TMS_T1", "TMS_moist"))
+# p <- p+ggplot2::scale_x_datetime(date_breaks = "1 week", date_labels = "%W")
+# p <- p+ggplot2::xlab("week")
+# p <- p+ggplot2::aes(size = sensor_name)
+# p <- p+ggplot2::scale_size_manual(values = c(1, 1 ,2))
+# p <- p+ggplot2::guides(size = "none")
+# p <- p+ggplot2::scale_color_manual(values = c("hotpink", "pink", "darkblue"), name = NULL)
+# 
+# ## raster
+# mc_plot_raster(tms, sensors = c("TMS_T3"))
+# 
 
 ## ----eval=TRUE,warning=F------------------------------------------------------
 # with defaults only convert Raw-format  to Agg-format

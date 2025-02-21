@@ -73,7 +73,25 @@ test_that("mc_prep_clean conflicts", {
         expect_warning("Object not cleaned. The function only tagged \\(states\\) measurements with cleaning conflicts.")
     expect_false(.prep_is_datetime_step_processed_in_object(data_conflicts))
     states <- data_conflicts$localities$`91184133`$loggers[[1]]$sensors$Thermo_T$states
-    expect_true(length(states$tag[states$tag == .model_const_SENSOR_STATE_CONFLICT]) > 0)
+    expect_true(length(states$tag[states$tag == .model_const_SENSOR_STATE_CLEAN_CONFLICT]) > 0)
+    data <- mc_read_files("../data/clean-conflict", "TOMST", clean=FALSE)
+    differnt_values_warning(data_conflicts <- mc_prep_clean(data, silent=T, resolve_conflicts=FALSE)) %>%
+        differnt_values_warning() %>%
+        expect_warning("Object not cleaned. The function only tagged \\(states\\) measurements with cleaning conflicts.")
+    states <- data_conflicts$localities$`92201076`$loggers$Dendro_1$sensors$Dendro_T$states
+    expect_equal(states$start[states$tag == .model_const_SENSOR_STATE_CLEAN_CONFLICT],
+        c(lubridate::ymd_hm("2023-01-13 15:30"),
+          lubridate::ymd_hm("2023-01-13 16:30"),
+          lubridate::ymd_hm("2023-01-13 23:00")))
+    expect_equal(states$end[states$tag == .model_const_SENSOR_STATE_CLEAN_CONFLICT],
+        c(lubridate::ymd_hm("2023-01-13 15:30"),
+          lubridate::ymd_hm("2023-01-13 16:45"),
+          lubridate::ymd_hm("2023-01-13 23:00")))
+    tolerance <- list()
+    tolerance[[.model_const_PHYSICAL_T_C]] <- 0.5
+    tolerance[[.model_const_PHYSICAL_radius_raw]] <- 10
+    data_conflicts <- mc_prep_clean(data, silent=T, resolve_conflicts=FALSE, tolerance=tolerance)
+    expect_true(.prep_is_datetime_step_processed_in_object(data_conflicts))
 })
 
 test_that("mc_prep_solar_tz", {
@@ -145,6 +163,7 @@ test_that("mc_prep_crop", {
     expect_equal(length(cropped_data$localities$A2E32$loggers[[1]]$datetime), 8)
     expect_equal(length(cropped_data$localities$A2E32$loggers[[1]]$sensors$TMS_T1$values), 8)
     expect_equal(cropped_data$localities$A2E32$loggers[[1]]$sensors$TMS_T1$states$end, lubridate::ymd_h("2020-10-16 08"))
+    expect_equal(length(cropped_data$localities$A1E05$loggers$Thermo_1$datetime), 0)
     cropped_data <- mc_prep_crop(data, end=as.POSIXct("2020-10-16 08:00", tz="UTC"), end_included=FALSE)
     test_raw_data_format(cropped_data)
     expect_equal(length(cropped_data$localities$A2E32$loggers[[1]]$datetime), 7)
@@ -183,26 +202,10 @@ test_that("mc_prep_crop by localities", {
     expect_error(cropped_data <- mc_prep_crop(data,
                                               start=as.POSIXct(c("2020-10-28 09:00", "2020-10-16 07:00"), tz="UTC"),
                                               end=as.POSIXct(c("2020-10-28 10:00", "2020-10-16 08:00"), tz="UTC")))
-    cropped_data <- mc_prep_crop(data,
-                                 start=as.POSIXct(c("2020-10-28 09:00", "2020-10-16 07:00"), tz="UTC"),
-                                 end=as.POSIXct(c("2020-10-28 10:00", "2020-10-16 08:00"), tz="UTC"),
-                                 localities=c("A1E05", "A2E32"))
-    test_raw_data_format(cropped_data)
-    expect_equal(cropped_data$localities$A1E05$loggers[[1]]$datetime,
-                 as.POSIXct(c("2020-10-28 09:00", "2020-10-28 09:15", "2020-10-28 09:30", "2020-10-28 09:45", "2020-10-28 10:00"), tz="UTC"))
-    expect_equal(cropped_data$localities$A2E32$loggers[[1]]$datetime,
-                 as.POSIXct(c("2020-10-16 07:00", "2020-10-16 07:15", "2020-10-16 07:30", "2020-10-16 07:45", "2020-10-16 08:00"), tz="UTC"))
-    expect_equal(cropped_data$localities$A6W79$loggers[[1]]$datetime, data$localities$A6W79$loggers[[1]]$datetime)
-    cropped_agg_data <- mc_prep_crop(agg_data,
-                                     start=as.POSIXct(c("2020-10-28 09:00", "2020-10-16 07:00"), tz="UTC"),
-                                     end=as.POSIXct(c("2020-10-28 10:00", "2020-10-16 08:00"), tz="UTC"),
-                                     localities=c("A1E05", "A2E32"))
-    test_agg_data_format(cropped_agg_data)
-    expect_equal(cropped_agg_data$localities$A1E05$datetime,
-                 as.POSIXct(c("2020-10-28 09:00", "2020-10-28 09:15", "2020-10-28 09:30", "2020-10-28 09:45", "2020-10-28 10:00"), tz="UTC"))
-    expect_equal(cropped_agg_data$localities$A2E32$datetime,
-                 as.POSIXct(c("2020-10-16 07:00", "2020-10-16 07:15", "2020-10-16 07:30", "2020-10-16 07:45", "2020-10-16 08:00"), tz="UTC"))
-    expect_equal(cropped_agg_data$localities$A6W79$datetime, agg_data$localities$A6W79$datetime)
+    expect_error(cropped_data <- mc_prep_crop(data,
+                                              start=as.POSIXct(c("2020-10-28 09:00", "2020-10-16 07:00"), tz="UTC"),
+                                              end=as.POSIXct(c("2020-10-28 10:00", "2020-10-16 08:00"), tz="UTC"),
+                                              localities=c("A1E05", "A2E32")))
 })
 
 test_that("mc_prep_crop errors", {
@@ -220,12 +223,47 @@ test_that("mc_prep_crop errors", {
                                lubridate::ymd_hm("2022-02-24 10:30")))
 })
 
+test_that("mc_prep_crop crop_table", {
+    data <- mc_read_data("../data/TOMST/files_table2.csv", clean=TRUE, silent=TRUE)
+    crop_table <- as.data.frame(tibble::tribble(
+        ~locality_id,  ~logger_name, ~start, ~end,
+        "A1E05"     ,       "TMS_1", lubridate::ymd_h("2022-04-07 08"), lubridate::ymd_h("2022-04-07 10"),
+        "A2E32"     , NA_character_, lubridate::ymd_h("2020-10-16 08"),                                NA,
+        "A6W79"     ,   "TMS_L45_1",                                NA, lubridate::ymd_h("2020-10-16 10"),
+    ))
+    cropped_data <- mc_prep_crop(data, crop_table=crop_table)
+    test_raw_data_format(cropped_data)
+    loggers <- mc_info_logger(cropped_data)
+    expect_equal(loggers$start_date, c(lubridate::ymd_hm("2020-10-28 08:45"),
+                                       lubridate::ymd_h("2022-04-07 08"),
+                                       lubridate::ymd_h("2020-10-16 08"),
+                                       lubridate::ymd_h("2020-10-16 00")))
+    expect_equal(loggers$end_date, c(lubridate::ymd_hm("2020-10-28 11:15"),
+                                     lubridate::ymd_h("2022-04-07 10"),
+                                     lubridate::ymd_hm("2020-10-17 00:45"),
+                                     lubridate::ymd_h("2020-10-16 10")))
+    crop_table <- as.data.frame(tibble::tribble(
+        ~locality_id,  ~logger_name, ~start, ~end,
+        "A1E05"     ,       "TMS_1", lubridate::ymd_h("2022-04-07 08"), lubridate::ymd_h("2022-04-07 10"),
+        "A1E05"     ,       "TMS_1", lubridate::ymd_h("2022-04-07 09"), lubridate::ymd_h("2022-04-07 10"),
+    ))
+    expect_error(cropped_data <- mc_prep_crop(data, crop_table=crop_table))
+})
+
+test_that("mc_prep_crop crop_table 2", {
+    data <- mc_load("../data/crop/data_cs_1.rds")
+    crop_table <- readRDS("../data/crop/crop_table_cs_1.rds")
+    crop_data <- mc_prep_crop(data, crop_table=crop_table)
+    test_raw_data_format(crop_data)
+})
+
 test_that(".prep_get_loggers_datetime_step_unprocessed", {
     data <- mc_read_data("../data/TOMST/files_table.csv", "../data/TOMST/localities_table.csv", clean=FALSE)
-    test_function <- if(exists(".prep_get_uncleaned_loggers")) .prep_get_uncleaned_loggers else .prep_get_uncleaned_loggers
-    expect_equal(test_function(data), c("91184101", "94184103", "94184102"))
+    uncleaned_loggers <- .prep_get_uncleaned_loggers(data)
+    expect_equal(uncleaned_loggers$locality_id, c("A1E05", "A2E32", "A6W79"))
+    expect_equal(uncleaned_loggers$logger_name, c("Thermo_1", "TMS_1", "TMS_1"))
     data_clean <- mc_prep_clean(data, silent=T)
-    expect_equal(length(test_function(data_clean)), 0)
+    expect_equal(nrow(.prep_get_uncleaned_loggers(data_clean)), 0)
 })
 
 test_that(".prep_get_utc_localities", {
@@ -290,6 +328,7 @@ test_that("mc_prep_merge raw-format same name", {
     data <- mc_read_data("../data/TOMST/files_table.csv", clean=FALSE)
     merged_data <- mc_prep_merge(list(data, data))
     test_raw_data_format(merged_data)
+    expect_equal(mc_info_logger(merged_data)$logger_name, c("Thermo_1", "Thermo_2", "TMS_1", "TMS_2", "TMS_1", "TMS_2"))
     expect_equal(names(merged_data$localities), c("A1E05", "A2E32", "A6W79"))
     expect_equal(length(merged_data$localities$A1E05$loggers), 2)
 })
@@ -410,4 +449,10 @@ test_that("mc_prep_TMSoffsoil", {
     agg_data <- mc_agg(data)
     agg_data_offsoil <- mc_prep_TMSoffsoil(agg_data, smooth=F)
     test_agg_data_format(agg_data_offsoil)
+})
+
+test_that("mc_prep_TMSoffsoil NA values", {
+    data <- mc_read_files("../data/TMSoffsoil/data_93142790_0.csv", "TOMST", silent=TRUE)
+    data_offsoil <- mc_prep_TMSoffsoil(data, smooth=F)
+    expect_false(any(is.na(data_offsoil$localities$`93142790`$loggers$TMS_1$sensors$off_soil$values)))
 })

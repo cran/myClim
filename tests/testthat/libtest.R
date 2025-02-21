@@ -23,25 +23,42 @@ test_myClimList <- function(data) {
     expect_true(is(data$metadata, "mc_MainMetadata"))
     expect_equal(class(data$localities), "list")
     expect_false(is.null(names(data$localities)))
+    expect_equal(anyDuplicated(names(data$localities)), 0)
 }
 
 test_raw_locality <- function(locality) {
     expect_equal(class(locality), "list")
     expect_equal(names(locality), c("metadata", "loggers"))
-    expect_true(is(locality$metadata, "mc_LocalityMetadata"))
+    test_locality_metadata(locality$metadata)
     expect_equal(class(locality$loggers), "list")
+    expect_false(is.null(names(locality$loggers)))
+    expect_false(any(duplicated(names(locality$loggers))))
+    expect_equal(names(locality$loggers), unname(purrr::map_chr(locality$loggers, ~ .x$metadata@name)))
     purrr::walk(locality$loggers, test_logger)
 }
 
 test_agg_locality <- function(locality) {
     expect_equal(class(locality), "list")
     expect_equal(names(locality), c("metadata", "datetime", "sensors"))
-    expect_true(is(locality$metadata, "mc_LocalityMetadata"))
+    test_locality_metadata(locality$metadata)
     test_datetime(locality$datetime)
     expect_equal(class(locality$sensors), "list")
+    expect_equal(anyDuplicated(names(locality$sensors)), 0)
     test_data_length(locality)
     test_sensors(locality)
 }
+
+test_locality_metadata <- function(metadata) {
+    expect_true(is(metadata, "mc_LocalityMetadata"))
+    slot_names <- slotNames(metadata)
+    for (param in myClim:::.model_const_EDITABLE_LOCALITY_METADATA_PARAMETERS) {
+        expect_true(param %in% slot_names)
+    }
+    expect_true(is.list(metadata@join_serial))
+    for(serial in metadata@join_serial) {
+        expect_true(is.character(serial))
+    }
+}    
 
 test_logger <- function(logger) {
     expect_equal(class(logger), "list")
@@ -52,6 +69,7 @@ test_logger <- function(logger) {
     test_datetime(logger$datetime)
     expect_equal(class(logger$sensors), "list")
     expect_true(length(logger$sensors) > 0)
+    expect_equal(anyDuplicated(names(logger$sensors)), 0)
     test_data_length(logger)
     test_sensors(logger)
 }
@@ -78,7 +96,16 @@ test_sensor <- function(sensor) {
     expect_equal(names(sensor), c("metadata", "values", "calibration", "states"))
     expect_true(is(sensor$metadata, "mc_SensorMetadata"))
     expect_true(sensor$metadata@sensor_id %in% names(mc_data_sensors))
-    expect_true(is.numeric(sensor$values) || is.logical(sensor$values) || all(is.na(sensor$values)))
+    all_is_na <- all(is.na(sensor$values))
+    expect_true(is.numeric(sensor$values) || is.logical(sensor$values) || all_is_na)
+    value_type <- mc_data_sensors[[sensor$metadata@sensor_id]]@value_type
+    if(value_type %in% c("real", "integer")) {
+        expect_true(is.numeric(sensor$values) || all_is_na)
+    } else if(value_type == "logical") {
+        expect_true(is.logical(sensor$values) || all_is_na)
+    } else {
+        stop("Unknown value type")
+    }
     test_calibration(sensor)
     test_states(sensor)
 }
