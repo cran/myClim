@@ -1,3 +1,32 @@
+# myClim 1.5.0
+* The new function `mc_prep_expandtime` has been added to expand time series to shorter steps.
+
+# myClim 1.4.5
+* Empty calibration parameters are now removed from joined data in the `mc_join` function.
+
+# myClim 1.4.4
+* The `mc_read_data` function now skips empty data files.
+* The minimum required R version is now 4.0.
+
+# myClim 1.4.3
+* The new function `mc_info_calib` has been added to provide an overview of the calibration parameters.
+* The output table of the `mc_info` function has been extended with the `height` and `calibrated` columns.
+* The `mc_prep_calib` function skips sensors that are already calibrated.
+
+# myClim 1.4.2
+* Only one logger can be used for uncleaned data in the `mc_reshape_wide` function.
+* The raw indexes are loaded from TOMST files to logger metadata.
+* The new function `mc_prep_delete` has been added.
+* The `loggers` parameter has been added to the `mc_filter` function.
+* The sensor without states in the `mc_plot_line` function has been fixed.
+* The missing states in mc_states_join have been fixed.
+* The new parameter `older_newer_suffix` has been added to the `mc_states_join` function.
+* The multiple parameters can be combined in the `mc_filter` function, if `reverse` is `TRUE`.
+* The unexistent tag issue in the `mc_states_replace` function has been fixed.
+
+# myClim 1.4.1
+* The calculated sensor in `mc_states_join` issue has been fixed.
+
 # myClim 1.4.0
 * The save localities unit test has been fixed.
 * CRAN version.

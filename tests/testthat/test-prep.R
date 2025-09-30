@@ -349,7 +349,7 @@ test_that("mc_prep_rename_locality wrong", {
     expect_error(data <- mc_prep_rename_locality(data, list(A1E05="A6W79")))
 })
 
-test_that("mc_prep_calib_load, mc_prep_calib", {
+test_that("mc_prep_calib_load, mc_prep_calib, mc_info_calib", {
     data <- mc_read_data("../data/TOMST/files_table.csv", clean=FALSE)
     calib_table <- as.data.frame(tibble::tribble(
         ~serial_number,          ~sensor_id,                     ~datetime, ~cor_factor,
@@ -384,12 +384,20 @@ test_that("mc_prep_calib_load, mc_prep_calib", {
     expect_equal(calib_data$localities$A6W79$loggers[[1]]$sensors$TMS_T2$values[[5]], 9.5 * 1.05 + 0.15)
     expect_true(calib_data$localities$A6W79$loggers[[1]]$sensors$TMS_T3$metadata@calibrated)
     expect_false(calib_data$localities$A6W79$loggers[[1]]$sensors$TMS_moist$metadata@calibrated)
+    expect_warning(expect_warning(calib_data <- mc_prep_calib(calib_data)))
+    info_table <- mc_info_calib(calib_data)
+    expect_equal(colnames(info_table), c("locality_id", "logger_name", "sensor_name", "datetime", "cor_factor", "cor_slope"))
+    expect_equal(nrow(info_table), nrow(calib_table))
     agg_data <- mc_agg(param_data)
     calib_data <- mc_prep_calib(agg_data, sensors = "Thermo_T")
     test_agg_data_format(calib_data)
     expect_true(calib_data$localities$A1E05$sensors$Thermo_T$metadata@calibrated)
     expect_equal(calib_data$localities$A1E05$sensors$Thermo_T$values[[1]], 9.875 + 0.1)
     expect_equal(calib_data$localities$A1E05$sensors$Thermo_T$values[[6]], 6.875 * 0.95)
+    info_table <- mc_info_calib(calib_data)
+    expect_equal(colnames(info_table), c("locality_id", "logger_name", "sensor_name", "datetime", "cor_factor", "cor_slope"))
+    expect_equal(nrow(info_table), nrow(calib_table))
+    expect_warning(expect_warning(calib_data <- mc_prep_calib(calib_data)))
 })
 
 test_that("mc_prep_calib_load wrong type", {
@@ -455,4 +463,46 @@ test_that("mc_prep_TMSoffsoil NA values", {
     data <- mc_read_files("../data/TMSoffsoil/data_93142790_0.csv", "TOMST", silent=TRUE)
     data_offsoil <- mc_prep_TMSoffsoil(data, smooth=F)
     expect_false(any(is.na(data_offsoil$localities$`93142790`$loggers$TMS_1$sensors$off_soil$values)))
+})
+
+test_that("mc_prep_delete", {
+    data <- mc_read_data("../data/TOMST/files_table.csv", "../data/TOMST/localities_table.csv", clean=FALSE)
+    index_table <- tibble::tribble(
+        ~locality_id,  ~logger_name, ~raw_index,
+        "A1E05"     ,    "Thermo_1",          1,
+        "A1E05"     ,    "Thermo_1",          3,
+        "A2E32"     ,       "TMS_1",         74,
+    )
+    data_delete <- mc_prep_delete(data, index_table)
+    test_raw_data_format(data_delete)
+    expect_equal(length(data_delete$localities$A1E05$loggers$Thermo_1$datetime), length(data$localities$A1E05$loggers$Thermo_1$datetime) - 2)
+    expect_equal(length(data_delete$localities$A2E32$loggers$TMS_1$datetime), length(data$localities$A2E32$loggers$TMS_1$datetime) - 1)
+    expect_equal(length(data_delete$localities$A6W79$loggers$TMS_1$datetime), length(data$localities$A6W79$loggers$TMS_1$datetime))
+    expect_equal(data_delete$localities$A1E05$loggers$Thermo_1$metadata@raw_index[1:3], c(0, 2, 4))
+})
+
+test_that("mc_prep_expandtime", {
+    expect_error(data_expanded <- mc_prep_expandtime(myClim::mc_data_example_raw, 900))
+    data <- mc_load("../data/expandtime/HOSEK_555.rds")
+    expect_error(data_expanded <- mc_prep_expandtime(data, "15 min"))
+    agg_data <-mc_agg(data, fun="mean", period="60 min") |>
+        expect_warning("sensor .*") |>
+        expect_warning("sensor .*") |>
+        expect_warning("sensor .*")
+    expect_error(data_expanded <- mc_prep_expandtime(agg_data, 900))
+    data_expanded <- mc_prep_expandtime(data, 1000) |>
+        expect_warning() |>
+        expect_warning()
+    data_expanded <- mc_prep_expandtime(data, 900)
+    test_raw_data_format(data_expanded)
+    changed_data <- mc_filter(data_expanded, loggers="HOBO_U23-001A_2")
+    changed_info <- mc_info(changed_data)
+    expect_true(all(changed_info$count_values == 30))
+    expect_true(all(changed_info$count_na == 29))
+    data_expanded2 <- mc_prep_expandtime(data, 900, localities = "HOSEK_555", loggers = "HOBO_U23-001A_2")
+    expect_equal(data_expanded, data_expanded2)
+    data_expanded3 <- mc_prep_expandtime(data, 900, from_step = 1600)
+    expect_equal(data, data_expanded3)
+    data_expanded4 <- mc_prep_expandtime(data, 900, from_step = 1800)
+    expect_equal(data_expanded, data_expanded4)
 })

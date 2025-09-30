@@ -21,6 +21,11 @@
 .prep_const_MESSAGE_VALUES_SAME_TIME <- "In logger {serial_number} are different values of {sensor_name} in same time."
 .prep_const_MESSAGE_STEP_PROBLEM <- "step cannot be detected for logger {logger$metadata@serial_number} - skip"
 .prep_const_MESSAGE_CLEAN_CONFLICT <- "Object not cleaned. The function only tagged (states) measurements with cleaning conflicts."
+.prep_const_MESSAGE_DELETE_FORMAT <- "The function requires uncleaned myClim object in Raw-format."
+.prep_const_MESSAGE_AGG_EXPANDTIME <- "It isn't possible to expandtime myClim object in Agg-format."
+.prep_const_MESSAGE_NOT_MULTIPLE_STEP <- "Logger {logger$metadata@name} step {logger_step} is not multiple of target step {to_step}. skipping"
+.prep_const_MESSAGE_SHORTER_STEP_IN_DATA <- "The minimal step {min_step} seconds in data is shorter than target step {to_step} seconds."
+.prep_const_MESSAGE_EXPANDTIME_TO_STEP <- "Parameter to_step must be positive number."
 
 #' Cleaning datetime series
 #'
@@ -195,6 +200,7 @@ mc_prep_clean <- function(data, silent=FALSE, resolve_conflicts=TRUE, tolerance=
     right_count_datetime <- diff(c(sorted_datetime[[1]], tail(sorted_datetime, n=1))) %/% logger$clean_info@step + 1
     logger$clean_info@count_missing <- right_count_datetime - (length(logger$datetime) - logger$clean_info@count_duplicities)
     logger$clean_info@rounded <- rounded
+    logger$metadata@raw_index <- NA_integer_
     logger
 }
 
@@ -694,6 +700,10 @@ mc_prep_crop <- function(data, start=NULL, end=NULL, localities=NULL, end_includ
 
 .prep_crop_data <- function(item, start, end, end_included) {
     table <- .common_sensor_values_as_tibble(item)
+    if(inherits(item$metadata, "mc_LoggerMetadata") &&
+        !any(is.na(item$metadata@raw_index))) {
+        table$raw_index__ <- item$metadata@raw_index
+    }
     if(!is.na(start)) {
         table <- dplyr::filter(table, .data$datetime >= start)
     }
@@ -706,6 +716,9 @@ mc_prep_crop <- function(data, start=NULL, end=NULL, localities=NULL, end_includ
         }
     }
     item$datetime <- table$datetime
+    if("raw_index__" %in% colnames(table)) {
+        item$metadata@raw_index <- table$raw_index__
+    }
     item$sensors <- purrr::map(item$sensors, function(sensor) {
         sensor$values <- table[[sensor$metadata@name]]
         sensor})
@@ -937,6 +950,13 @@ mc_prep_calib <- function(data, localities=NULL, sensors=NULL) {
         .prep_check_datetime_step_unprocessed(data, stop)
     }
 
+    info_env <- new.env()
+    info_env$count_success <- 0
+    info_env$count_calibrated <- 0
+    info_env$count_no_real <- 0
+    info_env$count_no_params <- 0
+    info_env$raw_moisture <- FALSE
+
     sensor_function <- function(sensor, datetime, locality_id) {
         if(is.null(sensors) && sensor$metadata@sensor_id %in% .model_const_WRONG_CALIBRATION_SENSOR_ID) {
             return(sensor)
@@ -945,17 +965,19 @@ mc_prep_calib <- function(data, localities=NULL, sensors=NULL) {
             return(sensor)
         }
         if(!is.null(sensors) && nrow(sensor$calibration) == 0) {
-            warning(stringr::str_glue("Calibration parameters are missing in sensor {sensor$metadata@name} in {locality_id}."))
+            info_env$count_no_params <- info_env$count_no_params + 1
             return(sensor)
         }
         if(.model_is_physical_moisture_raw(sensor$metadata)) {
-            warning(stringr::str_glue("Using simple linear correction of raw moisture values in sensor {sensor$metadata@name}, for more precisse correction use function mc_calc_vwc."))
+            info_env$raw_moisture_values <- TRUE
         }
         if(sensor$metadata@calibrated) {
-            stop(stringr::str_glue("Sensor {sensor$metadata@name} was already calibrated. It isn't possible recalibrate sensor."))
+            info_env$count_calibrated <- info_env$count_calibrated + 1
+            return(sensor)
         }
         if(!.model_is_type_real(sensor$metadata)) {
-            stop(stringr::str_glue("Value type of sensor {sensor$metadata@name} isn't real."))
+            info_env$count_no_real <- info_env$count_no_real + 1
+            return(sensor)
         }
 
         values_table <- tibble::tibble(datetime = datetime,
@@ -970,7 +992,8 @@ mc_prep_calib <- function(data, localities=NULL, sensors=NULL) {
         values <- purrr::pmap(dplyr::select(input_data, "cor_factor", "cor_slope", "data"), data_function)
         sensor$values <- purrr::flatten_dbl(values)
         sensor$metadata@calibrated <- TRUE
-        sensor
+        info_env$count_success <- info_env$count_success + 1
+        return(sensor)
     }
 
     logger_function <- function(logger, locality_id) {
@@ -991,6 +1014,26 @@ mc_prep_calib <- function(data, localities=NULL, sensors=NULL) {
     }
 
     data$localities <- purrr::map(data$localities, locality_function)
+    no_warning <- TRUE
+    if(info_env$raw_moisture) {
+        warning(stringr::str_glue("Using simple linear correction of raw moisture values, for more precisse correction use function mc_calc_vwc."))
+        no_warning <- FALSE
+    }
+    if(info_env$count_calibrated > 0) {
+        warning(stringr::str_glue("Skipped {info_env$count_calibrated} already calibrated sensors."))
+        no_warning <- FALSE
+    }
+    if(info_env$count_no_params > 0) {
+        warning(stringr::str_glue("Skipped {info_env$count_no_params} sensors without calibration parameters."))
+        no_warning <- FALSE
+    }
+    if(info_env$count_no_real > 0) {
+        warning(stringr::str_glue("Skipped {info_env$count_no_real} sensors with non-real values."))
+        no_warning <- FALSE
+    }
+    if(!no_warning) {
+        warning(stringr::str_glue("Calibrated {info_env$count_success} sensors."))
+    }
     return(data)
 }
 
@@ -1222,4 +1265,157 @@ mc_prep_TMSoffsoil <- function(data,
     }
     .calc_warn_if_overwriting(item, output_sensor)
     return(FALSE)
+}
+
+#' Delete values by index
+#'
+#' This function is used to delete values in uncleaned raw myClim object by index.
+#'
+#' @details
+#' Uncleaned logger contains raw indexes in metadata `@raw_index`. This function
+#' delete values by index_table parameter. This table (data.frame) contains 3 columns:
+#' 
+#'  * locality_id = id of locality
+#'  * logger_name = name of logger
+#'  * raw_index = index of the value to be deleted
+#' 
+#'  This function is used for data checking and validating. Especially in cases 
+#'  when there are duplicated values for identical time step. This allows you 
+#'  to manually (visually) select values to be deleted and delete them by table.   
+#'
+#' @template param_myClim_object_raw
+#' @param index_table data.frame (table); see details
+#' @return raw myClim data with deleted values.
+#' @export
+#' @examples
+#' index_table <- data.frame(locality_id = c("A1E05", "A1E05"),
+#'                           logger_name = c("Thermo_1", "Thermo_1"),
+#'                           raw_index = c(1, 2))
+#' data <- mc_prep_delete(mc_data_example_raw, index_table)
+mc_prep_delete <- function(data, index_table) {
+    if(!.common_is_raw_format(data) ||
+        .prep_is_datetime_step_processed_in_object(data)) {
+        stop(.prep_const_MESSAGE_DELETE_FORMAT)
+    }
+
+    result_env <- new.env()
+    result_env$data <- data
+
+    index_table <- dplyr::group_by(index_table, .data$locality_id, .data$logger_name)
+
+    group_function <- function(data_table, key_table) {
+        locality_id <- key_table$locality_id[[1]]
+        logger_name <- key_table$logger_name[[1]]
+        logger <- data$localities[[locality_id]]$loggers[[logger_name]]
+        table <- .prep_get_logger_table_with_index(logger)
+        table <- dplyr::filter(table, !(.data$raw_index__ %in% data_table$raw_index))
+        logger <- .prep_load_logger_values_from_table(logger, table)
+        result_env$data$localities[[locality_id]]$loggers[[logger_name]] <- logger
+    }
+
+    dplyr::group_walk(index_table, group_function)
+    return(result_env$data)
+}
+
+.prep_get_logger_table_with_index <- function(logger) {
+    table <- .common_sensor_values_as_tibble(logger)
+    table$raw_index__ <- logger$metadata@raw_index
+    return(table)
+}
+
+.prep_load_logger_values_from_table <- function(logger, table) {
+    logger$metadata@raw_index <- table$raw_index__
+    logger$datetime <- table$datetime
+    logger$sensors <- purrr::map(logger$sensors, function(sensor) {
+        sensor$values <- table[[sensor$metadata@name]]
+        return(sensor)})
+    return(logger)
+}
+
+#' Expand time steps
+#' 
+#' Expands (downscales) time steps in raw myClim objects, e.g. from 1 hour to 15 minutes.  
+#' The original step must be a multiple of the new step (e.g. 15 → 5 minutes works,  
+#' but 15 → 10 minutes does not).  
+#' Newly created gaps in the expanded series are filled with `NA`.  
+#'
+#' @details
+#' Works only with raw myClim objects.  
+#' If `from_step` is specified, only loggers with this step are expanded; 
+#' loggers with other steps remain unchanged.    
+#'
+#' @template param_myClim_object_cleaned
+#' @param to_step new time step in seconds (e.g. 3600 for one hour)
+#' @param localities IDs of localities to expand. If `NULL`, expands all localities (default)
+#' @param loggers names of loggers to expand. If `NULL`, expands all loggers (default).  
+#' @param from_step original time step in seconds to expand. 
+#'                  If `NULL`, expands all loggers with a step longer than `to_step`. 
+#' @return raw myClim data with expanded datetime.
+#' @export
+#' @examples
+#' mc_prep_expandtime(mc_data_example_clean, to_step = 300, localities = "A1E05", loggers = "Thermo_1")
+mc_prep_expandtime <- function(data, to_step, localities=NULL, loggers=NULL, from_step=NULL) {
+    is_agg <- .common_is_agg_format(data)
+    if(is_agg) {
+        stop(.prep_const_MESSAGE_AGG_EXPANDTIME)
+    }
+    .prep_check_datetime_step_unprocessed(data, stop)
+    .prep_warn_if_shorter_step_in_data(data, to_step, localities, loggers)
+    if(!is.numeric(to_step) || to_step <= 0) {
+        stop(.prep_const_MESSAGE_EXPANDTIME_TO_STEP)
+    }
+
+    logger_function <- function (logger) {
+        if(!(is.null(loggers) || logger$metadata@name %in% loggers)) {
+            return(logger)
+        }
+        logger_step <- logger$clean_info@step
+        if(!(is.null(from_step) || logger_step == from_step)) {
+            return(logger)
+        }
+        if(logger_step <= to_step) {
+            return(logger)
+        }
+        if(logger_step %% to_step != 0) {
+            warning(stringr::str_glue(.prep_const_MESSAGE_NOT_MULTIPLE_STEP))
+            return(logger)
+        }
+        logger <- .prep_expandtime_in_logger(logger, to_step)
+
+        return(logger)
+    }
+
+    locality_function <- function (locality) {
+        if(!(is.null(localities) || locality$metadata@locality_id %in% localities)) {
+            return(locality)
+        }
+        locality$loggers <- purrr::map(locality$loggers, logger_function)
+        return(locality)
+    }
+
+    data$localities <- purrr::map(data$localities, locality_function)
+    return(data)
+}
+
+.prep_warn_if_shorter_step_in_data <- function(data, to_step, localities, loggers) {
+    filtered_data <- mc_filter(data, localities = localities, loggers = loggers)
+    loggers <- mc_info_logger(filtered_data)
+    min_step <- min(loggers$step)
+    if(min_step < to_step) {
+        warning(stringr::str_glue(.prep_const_MESSAGE_SHORTER_STEP_IN_DATA))
+    }
+}
+
+
+.prep_expandtime_in_logger <- function(logger, to_step) {
+    logger_table <- .common_sensor_values_as_tibble(logger)
+    datetime <- seq(from = min(logger$datetime), to = max(logger$datetime), by = to_step)
+    new_logger_table <- tibble::tibble(datetime = datetime)
+    new_logger_table <- dplyr::left_join(new_logger_table, logger_table, by = "datetime")
+    logger$datetime <- new_logger_table$datetime
+    for(sensor_name in names(logger$sensors)) {
+        logger$sensors[[sensor_name]]$values <- new_logger_table[[sensor_name]]
+    }
+    logger$clean_info@step <- to_step
+    return(logger)
 }
