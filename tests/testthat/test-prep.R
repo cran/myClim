@@ -73,17 +73,17 @@ test_that("mc_prep_clean conflicts", {
         expect_warning("Object not cleaned. The function only tagged \\(states\\) measurements with cleaning conflicts.")
     expect_false(.prep_is_datetime_step_processed_in_object(data_conflicts))
     states <- data_conflicts$localities$`91184133`$loggers[[1]]$sensors$Thermo_T$states
-    expect_true(length(states$tag[states$tag == .model_const_SENSOR_STATE_CLEAN_CONFLICT]) > 0)
+    expect_true(length(states$tag[states$tag == mc_const_TAG_CLEAN_CONFLICT]) > 0)
     data <- mc_read_files("../data/clean-conflict", "TOMST", clean=FALSE)
     differnt_values_warning(data_conflicts <- mc_prep_clean(data, silent=T, resolve_conflicts=FALSE)) %>%
         differnt_values_warning() %>%
         expect_warning("Object not cleaned. The function only tagged \\(states\\) measurements with cleaning conflicts.")
     states <- data_conflicts$localities$`92201076`$loggers$Dendro_1$sensors$Dendro_T$states
-    expect_equal(states$start[states$tag == .model_const_SENSOR_STATE_CLEAN_CONFLICT],
+    expect_equal(states$start[states$tag == mc_const_TAG_CLEAN_CONFLICT],
         c(lubridate::ymd_hm("2023-01-13 15:30"),
           lubridate::ymd_hm("2023-01-13 16:30"),
           lubridate::ymd_hm("2023-01-13 23:00")))
-    expect_equal(states$end[states$tag == .model_const_SENSOR_STATE_CLEAN_CONFLICT],
+    expect_equal(states$end[states$tag == mc_const_TAG_CLEAN_CONFLICT],
         c(lubridate::ymd_hm("2023-01-13 15:30"),
           lubridate::ymd_hm("2023-01-13 16:45"),
           lubridate::ymd_hm("2023-01-13 23:00")))
@@ -211,7 +211,7 @@ test_that("mc_prep_crop by localities", {
 test_that("mc_prep_crop errors", {
     expect_warning(data <- mc_read_files("../data/TOMST-error", "TOMST", clean=FALSE))
     cropped_data <- mc_prep_crop(data, start=lubridate::ymd_hm("2022-02-24 07:45"), end=lubridate::ymd_hm("2022-02-24 10:30"))
-    states <- dplyr::filter(cropped_data$localities$data_93142777$loggers[[1]]$sensors$TMS_T2$states, .data$tag == .model_const_SENSOR_STATE_ERROR)
+    states <- dplyr::filter(cropped_data$localities$data_93142777$loggers[[1]]$sensors$TMS_T2$states, .data$tag == mc_const_TAG_ERROR)
     expect_equal(nrow(states), 4)
     expect_equal(states$start, c(lubridate::ymd_hm("2022-02-24 07:45"),
                                  lubridate::ymd_hm("2022-02-24 09:00"),
@@ -295,6 +295,41 @@ test_that("mc_prep_meta_sensor", {
 test_that("mc_prep_meta_sensor wrong", {
     data <- mc_read_data("../data/flat/files_table.csv", clean=FALSE)
     expect_error(data <- mc_prep_meta_sensor(data, list(TMS_T1="TMS_T2"), param_name = "name"))
+})
+
+test_that("mc_prep_meta_logger", {
+    data <- mc_read_data("../data/TOMST/files_table.csv", clean=FALSE)
+
+    changed_data <- mc_prep_meta_logger(data, list(TMS_1="TMS_main"), param_name="name", localities="A2E32")
+    test_raw_data_format(changed_data)
+    expect_true("TMS_main" %in% names(changed_data$localities$A2E32$loggers))
+    expect_true("TMS_1" %in% names(changed_data$localities$A6W79$loggers))
+    expect_equal(changed_data$localities$A2E32$loggers$TMS_main$metadata@name, "TMS_main")
+    expect_equal(changed_data$localities$A6W79$loggers$TMS_1$metadata@name, "TMS_1")
+
+    changed_data <- mc_prep_meta_logger(data, list(Thermo_1="90000000"), param_name="serial_number", localities="A1E05")
+    expect_equal(changed_data$localities$A1E05$loggers$Thermo_1$metadata@serial_number, "90000000")
+
+    changed_data <- mc_prep_meta_logger(data, list(TMS_1=3600), param_name="step", localities="A6W79")
+    expect_equal(changed_data$localities$A6W79$loggers$TMS_1$metadata@step, 3600)
+    expect_true(is.na(changed_data$localities$A2E32$loggers$TMS_1$metadata@step))
+
+    changed_data <- mc_prep_meta_logger(data, list(Thermo_1="T1", TMS_1="TMS(lizatko)"), param_name="type")
+    expect_equal(changed_data$localities$A1E05$loggers$Thermo_1$metadata@type, "T1")
+    expect_equal(changed_data$localities$A2E32$loggers$TMS_1$metadata@type, "TMS(lizatko)")
+})
+
+test_that("mc_prep_meta_logger wrong", {
+    data <- mc_read_data("../data/TOMST/files_table.csv", clean=FALSE)
+    cleaned_data <- mc_prep_clean(data, silent=TRUE)
+    agg_data <- mc_agg(cleaned_data)
+
+    expect_error(mc_prep_meta_logger(agg_data, list(TMS_1="TMS_main"), param_name="name"),
+                 "Agg-format")
+    expect_error(mc_prep_meta_logger(cleaned_data, list(TMS_1=3600), param_name="step"),
+                 "not possible to edit step in cleaned object")
+    expect_error(mc_prep_meta_logger(data, list(TMS_1="TMS_main"), param_name="wrong_slot"),
+                 "isn't possible to edit logger metadata slot")
 })
 
 test_that("mc_prep_merge wrong", {
@@ -505,4 +540,82 @@ test_that("mc_prep_expandtime", {
     expect_equal(data, data_expanded3)
     data_expanded4 <- mc_prep_expandtime(data, 900, from_step = 1800)
     expect_equal(data_expanded, data_expanded4)
+})
+
+test_that("mc_prep_trim", {
+    data <- mc_read_data("../data/TOMST/files_table.csv", clean=FALSE)
+    loggers_before <- mc_info_logger(data)
+
+    trimmed <- mc_prep_trim(data, start=TRUE, end=FALSE, n=1)
+    test_raw_data_format(trimmed)
+    loggers_after <- mc_info_logger(trimmed)
+    expect_equal(loggers_after$start_date - lubridate::minutes(15), loggers_before$start_date)
+    expect_equal(loggers_after$end_date, loggers_before$end_date)
+    expect_equal(data$localities$A1E05$loggers$Thermo_1$datetime[-1], trimmed$localities$A1E05$loggers$Thermo_1$datetime)
+    expect_equal(data$localities$A1E05$loggers$Thermo_1$metadata@raw_index[-1], trimmed$localities$A1E05$loggers$Thermo_1$metadata@raw_index)
+
+    trimmed <- mc_prep_trim(data, start=TRUE, end=TRUE, n=2)
+    test_raw_data_format(trimmed)
+    loggers_after <- mc_info_logger(trimmed)
+    expect_equal(loggers_after$start_date - lubridate::minutes(30), loggers_before$start_date)
+    expect_equal(loggers_after$end_date, loggers_before$end_date - lubridate::minutes(30))
+    expect_equal(data$localities$A1E05$loggers$Thermo_1$datetime[3:9], trimmed$localities$A1E05$loggers$Thermo_1$datetime)
+    expect_equal(data$localities$A1E05$loggers$Thermo_1$metadata@raw_index[3:9], trimmed$localities$A1E05$loggers$Thermo_1$metadata@raw_index)
+    
+    states_before <- mc_info_states(data)
+    states_after <- mc_info_states(trimmed)
+    expect_equal(states_after$start, states_before$start + lubridate::minutes(30))
+    expect_equal(states_after$end, states_before$end - lubridate::minutes(30))
+    
+    cleaned_data <- mc_prep_clean(data, silent=T)
+    trimmed <- mc_prep_trim(cleaned_data, start=TRUE, end=TRUE, n=1)
+    test_raw_data_format(trimmed)
+})
+
+test_that("mc_prep_trim logger_type", {
+    data <- mc_read_data("../data/TOMST/files_table.csv", clean=FALSE)
+    loggers_before <- mc_info_logger(data)
+
+    trimmed <- mc_prep_trim(data, start=TRUE, end=TRUE, n=1, logger_type="TMS")
+    loggers_after <- mc_info_logger(trimmed)
+
+    is_tms <- loggers_before$logger_type == "TMS"
+    expect_equal(loggers_after$start_date[is_tms] - lubridate::minutes(15), loggers_before$start_date[is_tms])
+    expect_equal(loggers_after$start_date[!is_tms], loggers_before$start_date[!is_tms])
+    expect_equal(loggers_after$end_date[is_tms], loggers_before$end_date[is_tms] - lubridate::minutes(15))
+    expect_equal(loggers_after$end_date[!is_tms], loggers_before$end_date[!is_tms])
+
+    trimmed <- mc_prep_trim(data, start=TRUE, end=TRUE, n=1, logger_type=c("TMS", "Thermo"))
+    loggers_after <- mc_info_logger(trimmed)
+    expect_equal(loggers_after$start_date - lubridate::minutes(15), loggers_before$start_date)
+    expect_equal(loggers_after$end_date, loggers_before$end_date - lubridate::minutes(15))
+})
+
+test_that("mc_prep_trim agg", {
+    data <- mc_read_data("../data/TOMST/files_table.csv", clean=TRUE, silent=TRUE)
+    agg_data <- mc_agg(data)
+    expect_warning(trimmed <- mc_prep_trim(agg_data, start=TRUE, end=TRUE, n=1, logger_type="TMS"))
+    test_agg_data_format(trimmed)
+    info_before <- mc_info(agg_data)
+    info_after <- mc_info(trimmed)
+    expect_equal(info_after$start_date - lubridate::minutes(15), info_before$start_date)
+    expect_equal(info_after$end_date, info_before$end_date - lubridate::minutes(15))
+})
+
+test_that("mc_prep_trim wrong params", {
+    data <- mc_read_data("../data/TOMST/files_table.csv", clean=FALSE)
+    expect_error(mc_prep_trim(data, start=FALSE, end=FALSE, n=1))
+    expect_error(mc_prep_trim(data, start=TRUE, end=FALSE, n=-1))
+    expect_error(mc_prep_trim(data, start=TRUE, end=FALSE, n=1.5))
+})
+
+test_that("mc_prep_trim empty", {
+    data <- mc_read_data("../data/TOMST/files_table.csv", clean=TRUE, silent=TRUE)
+    trimmed <- mc_prep_trim(data, start=TRUE, end=TRUE, n=6)
+    test_raw_data_format(trimmed)
+    loggers <- mc_info_logger(trimmed)
+    expect_true(is.na(loggers$start_date[[1]]))
+    expect_true(is.na(loggers$end_date[[1]]))
+    expect_true(all(!is.na(loggers$start_date[-1])))
+    expect_true(all(!is.na(loggers$end_date[-1])))
 })

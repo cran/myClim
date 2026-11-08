@@ -39,6 +39,7 @@ Value in this column have the highest priority. If NA then auto detection of tim
 If timezone can't be detected, then UTC is supposed.
 Timezone offset in HOBO format can be defined in header. In this case function try detect offset automatically.
 Ignored for TOMST TMS data format (they are always in UTC)
+EMS loggers require tz_offset definition.
 \item step - Time step of microclimatic time-series in seconds. When provided, then used in \link{mc_prep_clean}
 instead of automatic step detection. See details.
 }}
@@ -69,7 +70,7 @@ are associted withthose pre-defined metadata slots, other columns are  written i
 \item{silent}{if TRUE, then any information is not printed in console (default FALSE)}
 
 \item{user_data_formats}{custom data formats; use in case you have your own logger
-files not pre-defined in myClim  - list(key=mc_DataFormat) \linkS4class{mc_DataFormat} (default NULL)
+files not pre-defined in myClim  - list(key=mc_DataFormat) \link[=mc_DataFormat-class]{mc_DataFormat} (default NULL)
 
 If custom data format is defined the key can be used in data_format parameter in \code{\link[=mc_read_files]{mc_read_files()}}
 and \code{\link[=mc_read_data]{mc_read_data()}}. Custom data format must be defined first, and then an be used for reading.}

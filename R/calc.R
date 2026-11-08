@@ -5,7 +5,18 @@
 .calc_const_MESSAGE_SENSOR_NOT_EXISTS_IN_LOCALITIES <- "Sensor doesn't exist in any locality."
 .calc_const_MESSAGE_UNKNONW_SIOLTYPE <- "Soiltype {soiltype_value} is unknown."
 .calc_const_MESSAGE_WRONG_SOILTYPE <- "Soiltype doesn't contain all a, b, c parameters."
-.calc_const_MESSAGE_VPD_AGGREGATED <- "You are attempting to calculate VPD from aggregated temperature / RH values. Due to non-linear relationship between VPD and T/RH, this may produce biased VPD estimates."
+.calc_const_MESSAGE_VP_AGGREGATED <- "Calculating VPD/p_sat/p_act from aggregated temperature and RH may introduce bias due to non-linear T-RH relationships."
+.calc_const_MESSAGE_CUSTOM_RESULT_LENGTH <- "Custom function output length {output_length} does not match expected length {expected_length}."
+.calc_const_MESSAGE_CUSTOM_RESULT_TYPE <- "Custom function output has unsupported type. Use logical, integer, or numeric vector."
+.calc_const_MESSAGE_CUSTOM_AGG_LOGGER_TYPE_IGNORED <- "In agg format, logger_type is ignored."
+.calc_const_MESSAGE_CUSTOM_UNKNOWN_SENSOR_ID <- "output_sensor_id {output_sensor_id} is unknown. Use one of names(mc_data_sensors)."
+.calc_const_MESSAGE_CUSTOM_ERROR_LOCALITY <- "Custom function failed in locality {locality_id}: {error_message}"
+.calc_const_MESSAGE_CUSTOM_ERROR_LOGGER <- "Custom function failed in locality {locality_id}, logger {logger_name}: {error_message}"
+
+.calc_const_FUNC_TYPE <- list(
+    "EXPR" = "expression",
+    "FUNC" = "function"
+)
 
 #' Snow detection from temperature
 #'
@@ -144,6 +155,232 @@ mc_calc_snow <- function(data, sensor, output_sensor="snow", localities=NULL, ra
     }
 }
 
+#' Calculate custom virtual sensor from user function
+#'
+#' @description
+#' Creates a new virtual sensor on locality/logger in the myClim object.
+#' Values are computed by a user-defined function or an expression evaluated on
+#' a data table containing `datetime` and sensor columns.
+#'
+#' @details
+#' The user function receives a tibble with columns `datetime` and one column per
+#' sensor present at each logger (raw format) or locality (agg format).
+#' It must return a logical/integer/numeric vector with the same length as number of rows.
+#' To skip loggers/localities without sensors used in custom function, use the `sensors` parameter.
+#'
+#' When custom function is provided as an unquoted expression (as in [dplyr::mutate()]),
+#' it is evaluated by [rlang::eval_tidy()] with the data table as data mask, so sensor
+#' names can be used directly (e.g. `TMS_T1 - 2 * TMS_T3`). Pronouns `.data` and `.env`
+#' are available to distinguish sensor columns from variables in the calling environment
+#' (e.g. `.data$TMS_T1 - .env$offset`). Standard R functions
+#' (`mean()`, `dplyr::lag()`, `abs()`, etc.) are available. If the calculation fails
+#' (e.g. a referenced sensor is missing), the function stops with an error naming the locality
+#' (and logger in raw format). Use `sensors` parameter to skip loggers/localities without required sensors.
+#'
+#' @template param_myClim_object_cleaned
+#' @param custom_function Function or unquoted expression defining the calculation.
+#'   - **Function** (named or anonymous): first argument is `data_table` (tibble with `datetime` and
+#'     sensor columns); must return a vector of `logical`, `integer`, or `numeric`.
+#'     Return `NULL` to skip the item.
+#'   - **Expression**: unquoted R expression referencing sensor names as variables
+#'     (e.g. `TMS_T1 - TMS_T3`, `mean(TMS_T1)`). Evaluated per
+#'     locality/logger using [rlang::eval_tidy()].
+#' @param output_sensor Name of the newly created virtual sensor.
+#' @param output_sensor_id Output sensor_id (optional). If NULL (default),
+#' sensor_id is inferred from custom function output type (`logical`, `integer`, `real`).
+#' Must be one of `names(mc_data_sensors)` when provided.
+#' @param logger_type Logger type filter (optional). Character vector of logger types to process (e.g. `c("TMS","Thermo")`)
+#' In raw format this filters loggers; in agg format it determines default `sensors` when `sensors=NULL`.
+#' @param localities Character vector of `locality_id`s to process.
+#'   `NULL` (default) processes all localities.
+#' @param sensors Character vector of sensor names that must all be present in
+#'   a logger/locality for processing to occur. Items missing any of these
+#'   sensors are silently skipped. `NULL` (default) disables this check.
+#' @return The input myClim object with the new virtual sensor `output_sensor` added to
+#' all eligible localities/loggers.
+#' @export
+#' @examples
+#' # Function form - calculate difference between air and soil temperature
+#' diff_func <- function(data_table) {
+#'     data_table$TMS_T1 - data_table$TMS_T3
+#' }
+#' data_diff <- mc_calc_custom(
+#'     mc_data_example_clean,
+#'     custom_function = diff_func,
+#'     output_sensor = "DIFF_T1_T3",
+#'     output_sensor_id = "T_C",
+#'     logger_type   = "TMS",
+#'     sensors       = c("TMS_T1", "TMS_T3")
+#' )
+#' \donttest{
+#' mc_plot_line(data_diff, sensors = c("DIFF_T1_T3","TMS_T1","TMS_T3"))
+#' }
+#'
+#' # Expression form - equivalent result
+#' data_diff <- mc_calc_custom(
+#'     mc_data_example_clean,
+#'     custom_function = TMS_T1 - TMS_T3,
+#'     output_sensor   = "DIFF_T1_T3",
+#'     output_sensor_id = "T_C",
+#'     logger_type     = "TMS",
+#'     sensors         = c("TMS_T1", "TMS_T3")
+#' )
+#' \donttest{
+#' mc_plot_line(data_diff, sensors = c("DIFF_T1_T3","TMS_T1","TMS_T3"))
+#' }
+#'
+#' # Expression form - identify rain events based on TMS moisture sensor
+#' # (moisture increase > 50 units within 4 consecutive measurements)
+#' rain_event <- mc_calc_custom(
+#'     mc_data_example_clean,
+#'     custom_function = ifelse(dplyr::lead(TMS_moist, 4) - TMS_moist > 50, 1, 0),
+#'     output_sensor = "RAIN",
+#'     sensors       = c("TMS_moist")
+#' )
+#' \donttest{
+#' mc_plot_line(rain_event, sensors = c("TMS_moist","RAIN"))
+#' }
+mc_calc_custom <- function(data, custom_function, output_sensor, output_sensor_id=NULL,
+                           logger_type=NULL,localities=NULL, sensors=NULL) {
+    q_custom_function <- rlang::enquo(custom_function)
+    is_agg <- .common_is_agg_format(data)
+    if(!is_agg) {
+        .prep_check_datetime_step_unprocessed(data, stop)
+    }
+    .calc_check_custom_output_sensor_id(output_sensor_id)
+    if(is_agg && !is.null(logger_type)) {
+        warning(.calc_const_MESSAGE_CUSTOM_AGG_LOGGER_TYPE_IGNORED)
+    }
+    function_type <- .calc_get_function_type(q_custom_function)
+    if(function_type == .calc_const_FUNC_TYPE$FUNC) {
+        custom_function <- rlang::eval_tidy(q_custom_function)
+    }
+
+    call_custom <- function(item, locality_id, logger_name=NULL) {
+        if(!is.null(sensors)) {
+            if(!all(sensors %in% names(item$sensors))) {
+                return(item)
+            }
+        }
+        result <- tryCatch(
+            .calc_add_custom_sensor_to_item(item, output_sensor, output_sensor_id, function_type,
+                                            custom_function, q_custom_function),
+            error = function(e) {
+                error_message <- conditionMessage(e)
+                message_template <- if(is.null(logger_name)) .calc_const_MESSAGE_CUSTOM_ERROR_LOCALITY
+                                    else .calc_const_MESSAGE_CUSTOM_ERROR_LOGGER
+                stop(stringr::str_glue(message_template), call. = FALSE)
+            })
+        return(result)
+    }
+
+    logger_function <- function(logger, locality_id) {
+        if(!is.null(logger_type) && !(logger$metadata@type %in% logger_type)) {
+            return(logger)
+        }
+        call_custom(logger, locality_id, logger$metadata@name)
+    }
+
+    locality_function <- function(locality) {
+        if(!(is.null(localities) || locality$metadata@locality_id %in% localities)) {
+            return(locality)
+        }
+        locality_id <- locality$metadata@locality_id
+        if(is_agg) {
+            return(call_custom(locality, locality_id))
+        }
+        locality$loggers <- lapply(locality$loggers, logger_function, locality_id = locality_id)
+        return(locality)
+    }
+
+    data$localities <- lapply(data$localities, locality_function)
+    return(data)
+}
+
+.calc_get_function_type <- function(q_custom_function) {
+    expr_custom_function <- rlang::get_expr(q_custom_function)
+    env_custom_function <- rlang::get_env(q_custom_function)
+    # function object passed directly (e.g. via do.call)
+    if(is.function(expr_custom_function)) {
+        return(.calc_const_FUNC_TYPE$FUNC)
+    }
+    # anonymous function: function(x) ... or \(x) ...
+    if(rlang::is_call(expr_custom_function, "function")) {
+        return(.calc_const_FUNC_TYPE$FUNC)
+    }
+    # named function: my_function
+    if(rlang::is_symbol(expr_custom_function) &&
+       exists(rlang::as_string(expr_custom_function), envir = env_custom_function, mode = "function")) {
+        return(.calc_const_FUNC_TYPE$FUNC)
+    }
+    # named function from package: pkg::my_function
+    if(rlang::is_call(expr_custom_function, c("::", ":::"))) {
+        value <- tryCatch(rlang::eval_tidy(q_custom_function), error = function(e) NULL)
+        if(is.function(value)) {
+            return(.calc_const_FUNC_TYPE$FUNC)
+        }
+    }
+    return(.calc_const_FUNC_TYPE$EXPR)
+}
+
+.calc_add_custom_sensor_to_item <- function(item, output_sensor, output_sensor_id, function_type,
+                                            custom_function, q_custom_function) {
+    data_table <- .common_sensor_values_as_tibble(item)
+    if(function_type == .calc_const_FUNC_TYPE$EXPR) {
+        values <- rlang::eval_tidy(q_custom_function, data = data_table)
+    } else {
+        values <- custom_function(data_table)
+    }
+    if(is.null(values)) {
+        return(item)
+    }
+
+    .calc_warn_if_overwriting(item, output_sensor)
+    .calc_check_custom_values(values, nrow(data_table))
+    sensor_id <- .calc_get_sensor_id_from_custom_values(values, output_sensor_id)
+    item$sensors[[output_sensor]] <- .common_get_new_sensor(sensor_id, output_sensor, values = values)
+    return(item)
+}
+
+.calc_check_custom_values <- function(values, expected_length) {
+    if(length(values) != expected_length) {
+        output_length <- length(values)
+        stop(stringr::str_glue(.calc_const_MESSAGE_CUSTOM_RESULT_LENGTH))
+    }
+    if(is.logical(values) || is.integer(values) || is.numeric(values)) {
+        return()
+    }
+    stop(.calc_const_MESSAGE_CUSTOM_RESULT_TYPE)
+}
+
+.calc_get_sensor_id_from_custom_values <- function(values, output_sensor_id=NULL) {
+    if(!is.null(output_sensor_id)) {
+        return(output_sensor_id)
+    }
+    if(is.logical(values)) {
+        return(mc_const_SENSOR_logical)
+    }
+    if(is.integer(values)) {
+        return(mc_const_SENSOR_integer)
+    }
+    if(is.numeric(values)) {
+        return(mc_const_SENSOR_real)
+    }
+    stop(.calc_const_MESSAGE_CUSTOM_RESULT_TYPE)
+}
+
+.calc_check_custom_output_sensor_id <- function(output_sensor_id) {
+    if(is.null(output_sensor_id)) {
+        return()
+    }
+    if(length(output_sensor_id) != 1 || !is.character(output_sensor_id) || is.na(output_sensor_id)) {
+        stop(stringr::str_glue(.calc_const_MESSAGE_CUSTOM_UNKNOWN_SENSOR_ID))
+    }
+    if(!(output_sensor_id %in% names(myClim::mc_data_sensors))) {
+        stop(stringr::str_glue(.calc_const_MESSAGE_CUSTOM_UNKNOWN_SENSOR_ID))
+    }
+}
+
 #' Summary of TRUE/FALSE snow sensor
 #'
 #' @description
@@ -245,22 +482,23 @@ mc_calc_snow_agg <- function(data, snow_sensor="snow", localities=NULL, period=3
 #' Conversion of raw TMS soil moisture values to volumetric water content (VWC)
 #'
 #' @description
-#' This function creates a new virtual sensor on the locality within the myClim data object.
 #' Function converts the raw TMS soil moisture (scaled TDT signal)
-#' to volumetric water content (VWC).
+#' to volumetric water content (VWC). Calculated VWC values are added as new virtual logger.
 #'
 #' @details
-#' This function is suitable for TOMST TMS loggers measuring soil moisture in raw TMS units. 
+#' This function is designed for TOMST TMS loggers. 
 #' The raw TMS units represents inverted and numerically rescaled (1-4095) electromagnetic signal from the moisture sensor working
-#' on Time Domain Transmission principle (Wild et al. 2019). For TMS4 logger, the typical raw TMS moisture values range from cca    
-#' 115 units in dry air to cca 3635 units in distilled water - see [mc_calib_moisture].
+#' on Time Domain Transmission principle (Wild et al. 2019). For TMS3 logger version, the typical raw TMS moisture values ranged from     
+#' cca 115 units in dry air to cca 3635 units in distilled water. TMS4 version has slightly different range of raw values (typically  
+#' 250-700 units for air and 3650-3900 in water, depending on production series) and calibration is needed to comply with 
+#' available calibration curves inferited from Wild et al. 2019 - see [mc_calib_moisture].
 #'
 #' Raw TMS moisture values can be converted to the soil volumetric water content with calibration curves. The function provides 
-#' several experimentally derived calibration curves which were developped at reference temperature. To account for the difference 
-#' between reference and actual temperature, the function uses actual soil temperature values measured by TMS_T1 soil temperature 
-#' sensor.
+#' several experimentally derived calibration curves which were developped at reference temperature. To account for the temperature 
+#' drift, the function uses difference between actual soil temperature measured by TMS_T1 soil and reference temperature (default = 24°C)
 #'
-#' The default calibration curve is "universal", which was designed for mineral soils (see Kopecký et al. 2021). 
+#' The default calibration curve is "universal", which is average of curves derived for different mineral soils 
+#' (see Kopecký et al. 2021). 
 #' Specific calibration curves were developed for several soil types (see Wild et al. 2019) and the user can choose one of these 
 #' or can define its own calibration - see [mc_data_vwc_parameters]
 #' 
@@ -272,8 +510,9 @@ mc_calc_snow_agg <- function(data, snow_sensor="snow", localities=NULL, period=3
 #' It is also possible to define a new calibarion function with custom parameters `a`, `b` and `c`. These can be
 #' derived e.g. from TOMST TMS Calibr utility after entering custom ratio of clay, silt, sand.
 #'
-#' **Warning:** TOMST TMS Calibr utility was developed for TMS3 series of TMS loggers, which have 
-#' different range of raw soil moisture values than TMS4 series. 
+#' **Warning:** TOMST TMS Calibr utility was calibrated using TMS3 series of TMS loggers, which have 
+#' different range of raw soil moisture values than TMS4 series. It is necessary to recalibrate TMS4 loggers using [mc_calib_moisture] 
+#' function for actual range of raw air and water moisture signal.
 #'
 #' The function by default replace the moisture records in frozen soils with NA (param *frozen2NA*),
 #' because the TMS soil moisture sensor was not designed to measure in frozen soils and the returned values are thus not comparable
@@ -572,7 +811,12 @@ mc_calc_cumsum <- function(data, sensors, output_suffix="_cumsum", localities=NU
             return(item)
         }
         origin_sensor <- item$sensors[[sensor_name]]
-        output_sensor_id <- origin_sensor$metadata@sensor_id
+        origin_sensor_type_item <- myClim::mc_data_sensors[[origin_sensor$metadata@sensor_id]]
+        if(origin_sensor_type_item@value_type == .model_const_VALUE_TYPE_REAL) {
+            output_sensor_id <- mc_const_SENSOR_real
+        } else {
+            output_sensor_id <- mc_const_SENSOR_integer
+        }
         output_sensor_name <- stringr::str_glue("{origin_sensor$metadata@name}{output_suffix}")
         item <- .calc_add_sensor_to_item(item, sensor_name, output_sensor_id, output_sensor_name,
                                          values_function = values_function)
@@ -676,7 +920,11 @@ mc_calc_tomst_dendro <- function(data, dendro_sensor=mc_const_SENSOR_Dendro_raw,
 #' @param elevation value in meters (default 0)
 #' @param metadata_elevation if TRUE then elevation from metadata of locality is used (default TRUE)
 #' @param localities list of locality_ids for calculation; if NULL then all (default NULL)
-#' @return myClim object same as input but with added VPD sensor
+#' @param output_sensor_pact name of new virtual p_act sensor (see [myClim::mc_calc_pact()]);
+#' if NULL then p_act sensor is not created (default NULL)
+#' @param output_sensor_psat name of new virtual p_sat sensor (see [myClim::mc_calc_psat()]);
+#' if NULL then p_sat sensor is not created (default NULL)
+#' @return myClim object same as input but with added VPD sensor (and optionally p_act and p_sat sensors)
 #' @export
 #' @references
 #' Jones H.G. (2014) Plants and Microclimate, Third Edit. Cambridge University Press, Cambridge 
@@ -687,18 +935,95 @@ mc_calc_tomst_dendro <- function(data, dendro_sensor=mc_const_SENSOR_Dendro_raw,
 #' agg_data <- mc_calc_vpd(mc_data_example_agg, "HOBO_T", "HOBO_RH", localities="A2E32")
 mc_calc_vpd <- function(data, temp_sensor="HOBO_T", rh_sensor="HOBO_RH",
                         output_sensor="VPD", elevation=0,
+                        metadata_elevation=TRUE, localities=NULL,
+                        output_sensor_pact=NULL, output_sensor_psat=NULL) {
+    call_vpd_function <- function(item, elevation) {
+        item <- .calc_add_vpd_to_item(item, temp_sensor, rh_sensor, output_sensor, elevation)
+        if(!is.null(output_sensor_pact)) {
+            item <- .calc_add_pact_to_item(item, temp_sensor, rh_sensor, output_sensor_pact, elevation)
+        }
+        if(!is.null(output_sensor_psat)) {
+            item <- .calc_add_psat_to_item(item, temp_sensor, output_sensor_psat, elevation)
+        }
+        return(item)
+    }
+    
+    data <- .calc_vp_common(data, elevation, metadata_elevation, localities, call_vpd_function)
+
+    return(data)
+}
+
+#' Calculate saturation vapor pressure (in kPa)
+#'
+#' @description
+#' This function creates a new virtual sensor on locality within the myClim data object.
+#' The virtual sensor represents the saturation vapor pressure (in kPa) calculated
+#' from temperature.
+#'
+#' @template param_myClim_object_cleaned
+#' @param temp_sensor name of temperature sensor. Temperature sensor must be in T_C physical.
+#' @param output_sensor name of new virtual p_sat sensor (default "p_sat")
+#' @param elevation value in meters (default 0)
+#' @param metadata_elevation if TRUE then elevation from metadata of locality is used (default TRUE)
+#' @param localities list of locality_ids for calculation; if NULL then all (default NULL)
+#' @return myClim object same as input but with added p_sat sensor
+#' @export
+#'
+#' @examples
+#' agg_data <- mc_calc_psat(mc_data_example_agg, "HOBO_T", localities="A2E32")
+mc_calc_psat <- function(data, temp_sensor="HOBO_T", 
+                        output_sensor="p_sat", elevation=0,
                         metadata_elevation=TRUE, localities=NULL) {
+    call_psat_function <- function(item, elevation) {
+        .calc_add_psat_to_item(item, temp_sensor, output_sensor, elevation)
+    }
+    
+    data <- .calc_vp_common(data, elevation, metadata_elevation, localities, call_psat_function)
+
+    return(data)
+}
+
+#' Calculate actual vapor pressure (in kPa)
+#'
+#' @description
+#' This function creates a new virtual sensor on locality within the myClim data object.
+#' The virtual sensor represents the actual vapor pressure (in kPa) calculated
+#' from temperature and relative air humidity.
+#'
+#' @template param_myClim_object_cleaned
+#' @param temp_sensor name of temperature sensor. Temperature sensor must be in T_C physical.
+#' @param rh_sensor name of relative air humidity sensor. Humidity sensor must be in RH physical.
+#' @param output_sensor name of new virtual p_act sensor (default "p_act")
+#' @param elevation value in meters (default 0)
+#' @param metadata_elevation if TRUE then elevation from metadata of locality is used (default TRUE)
+#' @param localities list of locality_ids for calculation; if NULL then all (default NULL)
+#' @return myClim object same as input but with added p_act sensor
+#' @export
+#'
+#' @examples
+#' agg_data <- mc_calc_pact(mc_data_example_agg, "HOBO_T", "HOBO_RH", localities="A2E32")
+mc_calc_pact <- function(data, temp_sensor="HOBO_T", rh_sensor="HOBO_RH",
+                        output_sensor = "p_act", elevation=0,
+                        metadata_elevation=TRUE, localities=NULL) {
+    call_pact_function <- function(item, elevation) {
+        .calc_add_pact_to_item(item, temp_sensor, rh_sensor, output_sensor, elevation)
+    }
+    
+    data <- .calc_vp_common(data, elevation, metadata_elevation, localities, call_pact_function)
+
+    return(data)
+}
+
+.calc_vp_common <- function(data, elevation, metadata_elevation, localities, sensor_function)
+{
     is_agg <- .common_is_agg_format(data)
+
     if(!is_agg) {
         .prep_check_datetime_step_unprocessed(data, stop)
     }
 
     if(is_agg && lubridate::period(data$metadata@period) >= lubridate::days(1)) {
-        warning(.calc_const_MESSAGE_VPD_AGGREGATED)
-    }
-
-    call_vpd_function <- function(item, elevation) {
-        .calc_add_vpd_to_item(item, temp_sensor, rh_sensor, output_sensor, elevation)
+        warning(.calc_const_MESSAGE_VP_AGGREGATED)
     }
 
     locality_function <- function(locality) {
@@ -710,9 +1035,9 @@ mc_calc_vpd <- function(data, temp_sensor="HOBO_T", rh_sensor="HOBO_RH",
             local_elevation <- locality$metadata@elevation
         }
         if(is_agg) {
-            return(call_vpd_function(locality, local_elevation))
+            return(sensor_function(locality, local_elevation))
         }
-        locality$loggers <- purrr::map2(locality$loggers, local_elevation, call_vpd_function)
+        locality$loggers <- purrr::map2(locality$loggers, local_elevation, sensor_function)
         return(locality)
     }
     data$localities <- purrr::map(data$localities, locality_function)
@@ -720,39 +1045,83 @@ mc_calc_vpd <- function(data, temp_sensor="HOBO_T", rh_sensor="HOBO_RH",
 }
 
 .calc_add_vpd_to_item <- function(item, temp_sensor, rh_sensor, output_sensor, elevation) {
-    skip <- .calc_vpd_check_sensors_get_skip(item, temp_sensor, rh_sensor, output_sensor)
-    if(skip) {
+    skip_T <- .calc_vp_check_T_output_get_skip(item, temp_sensor, output_sensor)
+    skip_RH <- .calc_vp_check_RH_get_skip(item, rh_sensor)
+    if(skip_T || skip_RH) {
         return(item)
     }
 
     T <- item$sensors[[temp_sensor]]$values
     RH <- item$sensors[[rh_sensor]]$values
-    a <- 0.61121
-    b <- 18.678 - (T / 234.5)
-    c <- 257.14
-    P <- 101300 * exp(- elevation / 8200)
-    f <- 1.00072 + (10e-7 * P * (0.032 + 5.9 * 10e-6 * T^2)) #enhancement factor
-    values <- f * a * exp(b * T / (c + T)) * (1 - RH / 100)
+    params <- .calc_get_vapor_pressure_parameters(T, elevation)
+    values <- params$f * params$a * exp(params$b * T / (params$c + T)) * (1 - RH / 100)
 
     height <- item$sensors[[rh_sensor]]$metadata@height
     item$sensors[[output_sensor]] <- .common_get_new_sensor(mc_const_SENSOR_VPD, output_sensor,
-                                                                     height=height, values=values)
+                                                            height=height, values=values)
     return(item)
 }
 
-.calc_vpd_check_sensors_get_skip <- function(item, temp_sensor, rh_sensor, output_sensor){
+.calc_vp_check_T_output_get_skip <- function(item, temp_sensor, output_sensor){
     if(!.calc_check_sensor_in_item(item, temp_sensor)){
         return(TRUE)
     }
     if(!.model_is_physical_T_C(item$sensors[[temp_sensor]]$metadata)){
         .calc_wrong_physical_warning_function(temp_sensor, .model_const_PHYSICAL_T_C)
     }
+    .calc_warn_if_overwriting(item, output_sensor)
+    return(FALSE)
+}
+
+.calc_vp_check_RH_get_skip <- function(item, rh_sensor){
     if(!.calc_check_sensor_in_item(item, rh_sensor)){
         return(TRUE)
     }
     if(!.model_is_physical(item$sensors[[rh_sensor]]$metadata, .model_const_PHYSICAL_RH)){
         .calc_wrong_physical_warning_function(rh_sensor, .model_const_PHYSICAL_RH)
     }
-    .calc_warn_if_overwriting(item, output_sensor)
     return(FALSE)
+}
+
+.calc_get_vapor_pressure_parameters <- function(T, elevation) {
+    a <- 0.61121
+    b <- 18.678 - (T / 234.5)
+    c <- 257.14
+    P <- 101300 * exp(- elevation / 8200)
+    f <- 1.00072 + (10e-7 * P * (0.032 + 5.9 * 10e-6 * T^2)) #enhancement factor
+    return(list(a=a, b=b, c=c, f=f))
+}
+
+.calc_add_psat_to_item <- function(item, temp_sensor, output_sensor, elevation) {
+    skip_T <- .calc_vp_check_T_output_get_skip(item, temp_sensor, output_sensor)
+    if(skip_T) {
+        return(item)
+    }
+
+    T <- item$sensors[[temp_sensor]]$values
+    params <- .calc_get_vapor_pressure_parameters(T, elevation)
+    values <- params$f * params$a * exp(params$b * T / (params$c + T))
+
+    height <- item$sensors[[temp_sensor]]$metadata@height
+    item$sensors[[output_sensor]] <- .common_get_new_sensor(mc_const_SENSOR_p_sat, output_sensor,
+                                                            height=height, values=values)
+    return(item)
+}
+
+.calc_add_pact_to_item <- function(item, temp_sensor, rh_sensor, output_sensor, elevation) {
+    skip_T <- .calc_vp_check_T_output_get_skip(item, temp_sensor, output_sensor)
+    skip_RH <- .calc_vp_check_RH_get_skip(item, rh_sensor)
+    if(skip_T || skip_RH) {
+        return(item)
+    }
+
+    T <- item$sensors[[temp_sensor]]$values
+    RH <- item$sensors[[rh_sensor]]$values
+    params <- .calc_get_vapor_pressure_parameters(T, elevation)
+    values <- params$f * params$a * exp(params$b * T / (params$c + T)) * (RH / 100)
+
+    height <- item$sensors[[rh_sensor]]$metadata@height
+    item$sensors[[output_sensor]] <- .common_get_new_sensor(mc_const_SENSOR_p_act, output_sensor,
+                                                            height=height, values=values)
+    return(item)
 }

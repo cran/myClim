@@ -1,3 +1,33 @@
+# myClim 1.6.0
+* The function `mc_states_replace` has a new parameter `sensors` to replace values only on selected sensors.
+
+# myClim 1.5.8
+* Added standard constants for tags `join_conflict`, `missing_shield`, `displaced` and `loose_contact` (`mc_const_TAG_JOIN_CONFLICT`, `mc_const_TAG_MISSING_SHIELD`, `mc_const_TAG_DISPLACED`, `mc_const_TAG_LOOSE_CONTACT`).
+* Added new functions `mc_calc_psat` and `mc_calc_pact`.
+* The function `mc_calc_vpd` has new parameters `output_sensor_pact` and `output_sensor_psat` to optionally create p_act and p_sat sensors together with VPD.
+* Added the new function `mc_calc_custom` for calculating custom virtual sensors from user-defined functions.
+
+# myClim 1.5.7
+* Standard constants for tags are now available (`mc_const_TAG_ANOMALY`, `mc_const_TAG_CLEAN_CONFLICT`, `mc_const_TAG_ERROR`, `mc_const_TAG_SOURCE`).
+
+# myClim 1.5.6
+* Added data type checks for values of the new sensor.
+* Added the new function `mc_prep_meta_logger`.
+* The `mc_calc_cumsum` function now sets `sensor_id` to base sensors `mc_const_SENSOR_real` or `mc_const_SENSOR_integer`.
+
+# myClim 1.5.5
+* The `mc_info_states` function now returns an empty table with correct column names when no states are present.
+
+# myClim 1.5.4
+* Fixed the display of `vroom` parsing errors.
+
+# myClim 1.5.3
+* The functions `mc_info` and `mc_info_logger` now correctly show loggers without data.
+* A new function `mc_prep_trim` has been added to trim values at the start and/or end of time series.
+
+# myClim 1.5.2
+* Added EMS data format support for binary .dcv files (Minikin SP1, QTi, TH2).
+
 # myClim 1.5.1
 * Fixed compatibility issue with `data.table` 1.8.0.
 

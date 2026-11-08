@@ -5,7 +5,7 @@
 \alias{mc_data_physical}
 \title{Physical quantities definition}
 \format{
-An object of class \code{environment} of length 11.
+An object of class \code{environment} of length 13.
 }
 \usage{
 mc_data_physical
@@ -13,11 +13,11 @@ mc_data_physical
 \description{
 R object of class environment with the definitions of physical elements
 for recording the microclimate e.g. temperature, speed, depth, volumetric water content...
-see \linkS4class{mc_Physical}. Similarly as in case of logger format definitions \linkS4class{mc_DataFormat} it is easy
+see \link[=mc_Physical-class]{mc_Physical}. Similarly as in case of logger format definitions \link[=mc_DataFormat-class]{mc_DataFormat} it is easy
 to add new, physical here.
 }
 \seealso{
-\linkS4class{mc_Physical}
+\link[=mc_Physical-class]{mc_Physical}
 
 Currently supported physical elements:
 \itemize{
@@ -25,7 +25,9 @@ Currently supported physical elements:
 \item l_mm - length in mm
 \item l_um - length in um
 \item VWC - volumetric moisture in m3/m3
+\item PPFD - photosynthetic photon flux density in µmol/m²/s
 \item RH - relative humidity in \%
+\item SWP_bar - soil water potential in negative bar (-bar)
 \item T_C - temperature in °C
 \item t_h - time in hours
 \item moisture_raw - raw TMS moisture sensor values

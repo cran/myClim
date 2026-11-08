@@ -1,5 +1,171 @@
 source("libtest.R")
 
+test_that("mc_calc_custom", {
+    diff_func <- function(data_table) {
+        data_table$TMS_T1 - data_table$TMS_T3
+    }
+
+    raw_data <- mc_calc_custom(mc_data_example_clean,
+                               custom_function = diff_func,
+                               logger_type = "TMS",
+                               output_sensor = "DIFF_T1_T3")
+    test_raw_data_format(raw_data)
+    tms_logger <- purrr::detect(raw_data$localities$A2E32$loggers, ~ .x$metadata@type == "TMS")
+    thermo_logger <- purrr::detect(raw_data$localities$A2E32$loggers, ~ .x$metadata@type == "Thermo")
+    expect_true("DIFF_T1_T3" %in% names(tms_logger$sensors))
+    expect_false("DIFF_T1_T3" %in% names(thermo_logger$sensors))
+    expect_equal(tms_logger$sensors$DIFF_T1_T3$values,
+                 tms_logger$sensors$TMS_T1$values - tms_logger$sensors$TMS_T3$values)
+
+    agg_data <- mc_agg(mc_data_example_clean)
+    diff_func <- function(data_table) {
+        if(!all(c("TMS_T1", "TMS_T3") %in% names(data_table))) {
+            return(NULL)
+        }
+        return(data_table$TMS_T1 - data_table$TMS_T3)
+    }
+    expect_warning(
+        agg_data <- mc_calc_custom(agg_data,
+                                   custom_function = diff_func,
+                                   logger_type = "TMS",
+                                   output_sensor = "DIFF_T1_T3"),
+        regexp = "logger_type is ignored"
+    )
+    test_agg_data_format(agg_data)
+    expect_true("DIFF_T1_T3" %in% names(agg_data$localities$A2E32$sensors))
+    expect_equal(agg_data$localities$A2E32$sensors$DIFF_T1_T3$values,
+                 agg_data$localities$A2E32$sensors$TMS_T1$values - agg_data$localities$A2E32$sensors$TMS_T3$values)
+    unchanged_data <- mc_calc_custom(mc_data_example_clean,
+                                     custom_function = function(data_table) data_table$TMS_T1,
+                                     logger_type = "UNKNOWN",
+                                     output_sensor = "CUSTOM_WRONG")
+    info_orig <- mc_info(mc_data_example_clean)
+    info <- mc_info(unchanged_data)
+    expect_equal(nrow(info_orig), nrow(info))
+})
+
+test_that("mc_calc_custom respects sensors", {
+    diff_func <- function(data_table) {
+        data_table$TMS_T1 - data_table$TMS_T3
+    }
+
+    raw_data <- mc_calc_custom(mc_data_example_clean,
+                               custom_function = diff_func,
+                               output_sensor = "DIFF_T1_T3",
+                               logger_type = "TMS",
+                               sensors = c("TMS_T1", "TMS_T3"))
+    tms_logger <- purrr::detect(raw_data$localities$A2E32$loggers, ~ .x$metadata@type == "TMS")
+    thermo_logger <- purrr::detect(raw_data$localities$A2E32$loggers, ~ .x$metadata@type == "Thermo")
+    expect_true("DIFF_T1_T3" %in% names(tms_logger$sensors))
+    expect_false("DIFF_T1_T3" %in% names(thermo_logger$sensors))
+})
+
+test_that("mc_calc_custom errors", {
+    wrong_length <- function(data_table) {
+        rep(1, 10)
+    }
+    expect_error(
+        mc_calc_custom(mc_data_example_clean,
+                       custom_function = wrong_length,
+                       logger_type = "TMS",
+                       output_sensor = "CUSTOM_WRONG"),
+        regexp = "output length"
+    )
+
+    expect_error(
+        mc_calc_custom(mc_data_example_clean,
+                       custom_function = function(data_table) data_table$TMS_T1,
+                       logger_type = "TMS",
+                       output_sensor = "CUSTOM_WRONG",
+                       output_sensor_id = "NOT_A_SENSOR"),
+        regexp = "output_sensor_id .* is unknown"
+    )
+})
+
+test_that("mc_calc_custom respects output_sensor_id", {
+    raw_data <- mc_calc_custom(mc_data_example_clean,
+                               custom_function = function(data_table) data_table$TMS_T1 - data_table$TMS_T3,
+                               logger_type = "TMS",
+                               output_sensor = "DIFF_T1_T3",
+                               output_sensor_id = mc_const_SENSOR_T_C)
+
+    tms_logger <- purrr::detect(raw_data$localities$A2E32$loggers, ~ .x$metadata@type == "TMS")
+    expect_equal(tms_logger$sensors$DIFF_T1_T3$metadata@sensor_id, mc_const_SENSOR_T_C)
+})
+
+test_that("mc_calc_custom expression", {
+    raw_data <- mc_calc_custom(mc_data_example_clean,
+                               custom_function = TMS_T1 - TMS_T3,
+                               logger_type = "TMS",
+                               output_sensor = "DIFF_T1_T3")
+    test_raw_data_format(raw_data)
+    tms_logger <- purrr::detect(raw_data$localities$A2E32$loggers, ~ .x$metadata@type == "TMS")
+    expect_equal(tms_logger$sensors$DIFF_T1_T3$values,
+                 tms_logger$sensors$TMS_T1$values - tms_logger$sensors$TMS_T3$values)
+
+    offset <- 2
+    raw_data <- mc_calc_custom(mc_data_example_clean,
+                               custom_function = .data$TMS_T1 - offset,
+                               logger_type = "TMS",
+                               output_sensor = "T1_OFFSET")
+    tms_logger <- purrr::detect(raw_data$localities$A2E32$loggers, ~ .x$metadata@type == "TMS")
+    expect_equal(tms_logger$sensors$T1_OFFSET$values, tms_logger$sensors$TMS_T1$values - offset)
+
+    agg_data <- mc_calc_custom(mc_agg(mc_data_example_clean),
+                               custom_function = TMS_T1 - TMS_T3,
+                               output_sensor = "DIFF_T1_T3",
+                               sensors = c("TMS_T1", "TMS_T3"))
+    test_agg_data_format(agg_data)
+    expect_equal(agg_data$localities$A2E32$sensors$DIFF_T1_T3$values,
+                 agg_data$localities$A2E32$sensors$TMS_T1$values - agg_data$localities$A2E32$sensors$TMS_T3$values)
+})
+
+test_that("mc_calc_custom function types", {
+    raw_data <- mc_calc_custom(mc_data_example_clean,
+                               custom_function = \(data_table) data_table$TMS_T1 * 2,
+                               logger_type = "TMS",
+                               output_sensor = "T1_DOUBLE")
+    tms_logger <- purrr::detect(raw_data$localities$A2E32$loggers, ~ .x$metadata@type == "TMS")
+    expect_equal(tms_logger$sensors$T1_DOUBLE$values, tms_logger$sensors$TMS_T1$values * 2)
+
+    # pkg::function is detected as function, so it is called with data_table
+    expect_error(mc_calc_custom(mc_data_example_clean,
+                                custom_function = base::nrow,
+                                logger_type = "TMS",
+                                localities = "A2E32",
+                                output_sensor = "N_ROWS"),
+                 regexp = "output length")
+})
+
+test_that("mc_calc_custom calculation errors", {
+    expect_error(
+        mc_calc_custom(mc_data_example_clean,
+                       custom_function = TMS_T1 - TMS_T3,
+                       logger_type = "Thermo",
+                       localities = "A1E05",
+                       output_sensor = "DIFF_T1_T3"),
+        regexp = "failed in locality A1E05, logger Thermo.*TMS_T1"
+    )
+
+    expect_error(
+        mc_calc_custom(mc_data_example_clean,
+                       custom_function = function(data_table) stop("boom"),
+                       logger_type = "TMS",
+                       localities = "A2E32",
+                       output_sensor = "CUSTOM_WRONG"),
+        regexp = "failed in locality A2E32, logger TMS.*boom"
+    )
+
+    agg_data <- mc_agg(mc_data_example_clean)
+    expect_error(
+        mc_calc_custom(agg_data,
+                       custom_function = NOT_EXISTS * 2,
+                       localities = "A2E32",
+                       output_sensor = "CUSTOM_WRONG"),
+        regexp = "failed in locality A2E32: .*NOT_EXISTS"
+    )
+})
+
 test_that("mc_calc_snow", {
     cleaned_data <- mc_read_files("../data/eco-snow", "TOMST", silent=T)
     snow_raw_data <- mc_calc_snow(cleaned_data, "TMS_T3", output_sensor="T3_snow", range=1.5, tmax=0.5)
@@ -153,32 +319,63 @@ test_that("mc_calc_tomst_dendro", {
                  (agg_data$localities$`92192250`$sensors$Dendro_raw$values[[1]] - 1279) * (8890 / (34000 - 1279)))
 })
 
-test_that("mc_calc_vpd", {
+test_that("mc_calc_vpd mc_calc_psat mc_calc_pact", {
     data <- mc_read_files("../data/HOBO/20024354.txt", "HOBO", date_format = "%d.%m.%Y %H:%M:%S", clean=FALSE, silent=TRUE)
     data <- mc_prep_meta_locality(data, list(`20024354`="LOC"), param_name = "locality_id")
     cleaned_data <- mc_prep_clean(data, silent=T)
     raw_data <- mc_calc_vpd(cleaned_data, mc_const_SENSOR_HOBO_T, mc_const_SENSOR_HOBO_RH)
+    raw_data <- mc_calc_psat(raw_data, mc_const_SENSOR_HOBO_T)
+    raw_data <- mc_calc_pact(raw_data, mc_const_SENSOR_HOBO_T, mc_const_SENSOR_HOBO_RH)
     test_raw_data_format(raw_data)
     expect_true("VPD" %in% names(raw_data$localities$LOC$loggers[[1]]$sensors))
+    expect_true("p_sat" %in% names(raw_data$localities$LOC$loggers[[1]]$sensors))
+    expect_true("p_act" %in% names(raw_data$localities$LOC$loggers[[1]]$sensors))
     agg_data <- mc_agg(cleaned_data)
     agg_data <- mc_calc_vpd(agg_data, mc_const_SENSOR_HOBO_T, mc_const_SENSOR_HOBO_RH)
+    agg_data <- mc_calc_psat(agg_data, mc_const_SENSOR_HOBO_T)
+    agg_data <- mc_calc_pact(agg_data, mc_const_SENSOR_HOBO_T, mc_const_SENSOR_HOBO_RH)
     test_agg_data_format(agg_data)
-    vpd_martin <- function(t,rh,elev = 0) {
+    vp_martin <- function(t,rh,elev = 0) {
         a <- 0.61121
         b <- 18.678 - (t/234.5)
         c <- 257.14
         P <- 101300*exp(-elev/8200)
         f <- 1.00072 + (10e-7*P*(0.032+5.9*10e-6*t^2)) #enhancement factor
         vpd <- f*a*exp(b*t/(c+t))*(1-rh/100)
-        return(vpd)
+        p_sat <- f*a*exp(b*t/(c+t))
+        p_act <- f*a*exp(b*t/(c+t))*(rh/100)
+        return(list(vpd=vpd, p_sat=p_sat, p_act=p_act))
     }
-    expect_equal(vpd_martin(agg_data$localities$LOC$sensors$HOBO_T$values[[1]],
-                            agg_data$localities$LOC$sensors$HOBO_RH$values[[1]]),
-                 agg_data$localities$LOC$sensors$VPD$values[[1]])
+    vp_values <- vp_martin(agg_data$localities$LOC$sensors$HOBO_T$values[[1]],
+                            agg_data$localities$LOC$sensors$HOBO_RH$values[[1]])
+    expect_equal(vp_values$vpd, agg_data$localities$LOC$sensors$VPD$values[[1]])
+    expect_equal(vp_values$p_sat, agg_data$localities$LOC$sensors$p_sat$values[[1]])
+    expect_equal(vp_values$p_act, agg_data$localities$LOC$sensors$p_act$values[[1]])
     agg_data <- mc_prep_meta_locality(agg_data, list(LOC = 500), "elevation")
     agg_data <- mc_calc_vpd(agg_data, mc_const_SENSOR_HOBO_T, mc_const_SENSOR_HOBO_RH,
                              output_sensor = "VPD500")
-    expect_equal(vpd_martin(agg_data$localities$LOC$sensors$HOBO_T$values[[1]],
-                            agg_data$localities$LOC$sensors$HOBO_RH$values[[1]], elev = 500),
-                 agg_data$localities$LOC$sensors$VPD500$values[[1]])
+    agg_data <- mc_calc_psat(agg_data, mc_const_SENSOR_HOBO_T,
+                             output_sensor = "p_sat500", elevation = 500)
+    agg_data <- mc_calc_pact(agg_data, mc_const_SENSOR_HOBO_T, mc_const_SENSOR_HOBO_RH,
+                             output_sensor = "p_act500", elevation = 500)
+    vp_values <- vp_martin(agg_data$localities$LOC$sensors$HOBO_T$values[[1]],
+                            agg_data$localities$LOC$sensors$HOBO_RH$values[[1]], elev = 500)
+    expect_equal(vp_values$vpd, agg_data$localities$LOC$sensors$VPD500$values[[1]])
+    expect_equal(vp_values$p_sat, agg_data$localities$LOC$sensors$p_sat500$values[[1]])
+    expect_equal(vp_values$p_act, agg_data$localities$LOC$sensors$p_act500$values[[1]])
+    sensors_count <- length(agg_data$localities$LOC$sensors)
+    agg_data <- mc_calc_vpd(agg_data, mc_const_SENSOR_HOBO_T, mc_const_SENSOR_HOBO_RH,
+                            output_sensor = "VPD2")
+    expect_equal(length(agg_data$localities$LOC$sensors), sensors_count + 1)
+    agg_data <- mc_calc_vpd(agg_data, mc_const_SENSOR_HOBO_T, mc_const_SENSOR_HOBO_RH,
+                            output_sensor = "VPD3", output_sensor_pact = "p_act3",
+                            output_sensor_psat = "p_sat3")
+    test_agg_data_format(agg_data)
+    expect_equal(vp_values$vpd, agg_data$localities$LOC$sensors$VPD3$values[[1]])
+    expect_equal(vp_values$p_sat, agg_data$localities$LOC$sensors$p_sat3$values[[1]])
+    expect_equal(vp_values$p_act, agg_data$localities$LOC$sensors$p_act3$values[[1]])
+    raw_data <- mc_calc_vpd(cleaned_data, mc_const_SENSOR_HOBO_T, mc_const_SENSOR_HOBO_RH,
+                            output_sensor_pact = "p_act", output_sensor_psat = "p_sat")
+    test_raw_data_format(raw_data)
+    expect_true(all(c("VPD", "p_act", "p_sat") %in% names(raw_data$localities$LOC$loggers[[1]]$sensors)))
 })

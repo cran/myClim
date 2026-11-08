@@ -29,6 +29,17 @@ test_that("mc_info", {
     expect_equal(nrow(info_agg_data), 12)
 })
 
+test_that("mc_info mc_info_logger empty", {
+    data <- mc_read_files("../data/clean-datetime_step", "TOMST", clean=FALSE)
+    crop_data <- mc_prep_crop(data, end=lubridate::ymd_hm("2018-09-15 00:00"))
+    info <- mc_info(crop_data)
+    expect_equal(sum(is.na(info$start_date)), 16)
+    expect_equal(sum(is.na(info$end_date)), 16)
+    info_logger <- mc_info_logger(crop_data)
+    expect_equal(sum(is.na(info_logger$start_date)), 4)
+    expect_equal(sum(is.na(info_logger$end_date)), 4)
+})
+
 test_that("mc_info no data FIX", {
     data <- mc_read_files("../data/eco-snow", "TOMST", silent=T)
     all_data <- mc_agg(data, "mean", "all")
@@ -72,6 +83,10 @@ test_that("mc_info_states", {
                                      "tag", "start", "end", "value"))
     expect_equal(nrow(states), 9)
     expect_true(all(is.na(states$logger_name)))
+    data_without_states <- mc_states_delete(data, tags="source")
+    states <- mc_info_states(data_without_states)
+    expect_equal(colnames(states), c("locality_id", "logger_name", "sensor_name",
+                                     "tag", "start", "end", "value"))
 })
 
 test_that("mc_info_range", {
@@ -87,3 +102,4 @@ test_that("mc_info_range", {
     expect_equal(range_table$min_value[range_table$sensor_name == "TMS_T2_mean"], -40)
     expect_equal(range_table$max_value[range_table$sensor_name == "TMS_moist_max"], 4000)
 })
+

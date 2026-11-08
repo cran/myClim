@@ -1,7 +1,7 @@
 Package: myClim
 Type: Package
 Title: Microclimatic Data Processing
-Version: 1.5.1
+Version: 1.6.0
 URL: http://labgis.ibot.cas.cz/myclim/index.html,
         https://github.com/ibot-geoecology/myClim
 Authors@R: c(
@@ -23,17 +23,17 @@ Description: Handling the microclimatic data in R. The 'myClim' workflow begins
 License: GPL (>= 2)
 Encoding: UTF-8
 LazyData: true
-RoxygenNote: 7.3.3
 Depends: R (>= 4.0)
-Imports: stringr, lubridate, tibble, dplyr, purrr, tidyr, ggplot2,
-        ggforce, viridis, data.table (>= 1.18.0), plotly, zoo, methods,
-        vroom, progress
+Imports: stringr, lubridate, tibble, dplyr, rlang, purrr, tidyr,
+        ggplot2, ggforce, viridis, data.table (>= 1.18.0), plotly, zoo,
+        methods, vroom, progress
 Additional_repositories: https://ibot-geoecology.github.io/drat
 Suggests: rmarkdown, knitr, kableExtra, rTubeDB, testthat (>= 3.0.0)
 VignetteBuilder: knitr
 Config/testthat/edition: 3
+Config/roxygen2/version: 8.0.0
 NeedsCompilation: no
-Packaged: 2025-12-29 12:55:33 UTC; jules
+Packaged: 2026-11-04 12:54:37 UTC; jules
 Author: Matěj Man [aut],
   Vojtěch Kalčík [aut, cre],
   Martin Macek [aut],
@@ -44,4 +44,4 @@ Author: Matěj Man [aut],
   Institute of Botany of the Czech Academy of Sciences [cph]
 Maintainer: Vojtěch Kalčík <Vojtech.Kalcik@ibot.cas.cz>
 Repository: CRAN
-Date/Publication: 2026-01-07 21:50:02 UTC
+Date/Publication: 2026-11-08 16:50:02 UTC

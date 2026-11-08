@@ -21,7 +21,7 @@ test_that("mc_read_data csv without localities", {
     expect_equal(length(data$localities$A1E05$loggers[["Thermo_1"]]$sensors), 1)
     expect_true(is.na(data$localities$A1E05$loggers[["Thermo_1"]]$metadata@step))
     expect_true(is.na(data$localities$A1E05$metadata@elevation))
-    expect_equal(data$localities$A1E05$loggers[["Thermo_1"]]$sensors$Thermo_T$states$tag, myClim:::.model_const_SENSOR_STATE_SOURCE)
+    expect_equal(data$localities$A1E05$loggers[["Thermo_1"]]$sensors$Thermo_T$states$tag, mc_const_TAG_SOURCE)
     expect_equal(data$localities$A1E05$loggers[["Thermo_1"]]$sensors$Thermo_T$states$start, dplyr::first(data$localities$A1E05$loggers[[1]]$datetime))
     expect_equal(data$localities$A1E05$loggers[["Thermo_1"]]$sensors$Thermo_T$states$end, dplyr::last(data$localities$A1E05$loggers[[1]]$datetime))
     expect_equal(data$localities$A1E05$loggers[["Thermo_1"]]$sensors$Thermo_T$states$value, normalizePath("../data/TOMST/data_91184101_0.csv"))
@@ -173,7 +173,7 @@ test_that("mc_read_files TOMST comma in number", {
 test_that("mc_read_files TOMST with error in data", {
     expect_warning(data <- mc_read_files("../data/TOMST-error", "TOMST", clean=FALSE))
     expect_true(is.na(data$localities$data_93142777$loggers[["TMS_1"]]$sensors$TMS_T2$values[[7]]))
-    states <- dplyr::filter(data$localities$data_93142777$loggers[["TMS_1"]]$sensors$TMS_T2$states, .data$tag == .model_const_SENSOR_STATE_ERROR)
+    states <- dplyr::filter(data$localities$data_93142777$loggers[["TMS_1"]]$sensors$TMS_T2$states, .data$tag == mc_const_TAG_ERROR)
     expect_equal(nrow(states), 6)
     expect_equal(states$start, c(lubridate::ymd_hm("2022-02-24 06:00"),
                                  lubridate::ymd_hm("2022-02-24 07:15"),
@@ -231,6 +231,14 @@ test_that("mc_read_wide", {
     expect_equal(data$localities$B1BLAT01$loggers[["Logger_1"]]$sensors[[1]]$values[[1]], 0.7)
 })
 
+test_that("mc_read_wide character", {
+    data_table <- readRDS("../data/read_table/precip.Rds")
+    dates <- data_table$date
+    data_table$date <- as.POSIXct(lubridate::ymd(dates, tz="UTC"))
+    data_table$B1BLAT01 <- as.character(data_table$B1BLAT01)
+    expect_error(data <- mc_read_wide(data_table, mc_const_SENSOR_precipitation, clean=FALSE))
+})
+
 test_that("mc_read_long", {
     data_table_precip <- readRDS("../data/read_table/precip.Rds")[1:10]
     data_table_precip <- tidyr::gather(data_table_precip, "locality_id", "value", -date)
@@ -245,6 +253,19 @@ test_that("mc_read_long", {
     data <- mc_read_long(data_table, list(precip="precipitation"), clean=FALSE)
     test_raw_data_format(data)
     expect_equal(length(data$localities), 9)
+})
+
+test_that("mc_read_long character value", {
+    data_table <- readRDS("../data/read_table/precip.Rds")[1:10]
+    data_table <- tidyr::gather(data_table, "locality_id", "value", -date)
+    data_table$sensor_name <- "precip"
+    data_table <- dplyr::rename(data_table, datetime=date)
+    data_table <- dplyr::select(data_table, locality_id, sensor_name, datetime, value)
+    data_table$datetime <- as.POSIXct(lubridate::ymd(data_table$datetime, tz="UTC"))
+    data_table$value <- as.character(data_table$value)
+    expect_error(
+        data <- mc_read_long(data_table, list(precip="precipitation"), clean=FALSE)
+    )
 })
 
 test_that("mc_read_files TOMST serial_number", {
@@ -331,4 +352,66 @@ test_that("mc_read_data HOBO empty", {
     data <- mc_read_data(files_table, clean=FALSE) |>
         expect_warning("Data file ../data/HOBO/20847126_empty.txt is empty - skipping.") |>
         expect_error("There are no valid localities.")
+})
+
+test_that("mc_read_data EMS", {
+    files_table <- as.data.frame(tibble::tribble(
+        ~path, ~locality_id, ~data_format,
+        "../data/EMSBrno/00_2025_11_05.dcv", "A", "EMS",
+        "../data/EMSBrno/18_2025_11_03.dcv", "A", "EMS",
+        "../data/EMSBrno/B4_2025_12_15.dcv", "A", "EMS",
+    ))
+    expect_error(data <- mc_read_data(files_table, clean=FALSE))
+    files_table$tz_offset <- 60
+    data <- mc_read_data(files_table, clean=FALSE)
+    test_raw_data_format(data)
+    expect_equal(names(data$localities), "A")
+    expect_equal(names(data$localities$A$loggers), c("Minikin_SP1_1", "Minikin_QTi_1", "Minikin_TH2_1"))
+    expect_equal(length(data$localities$A$loggers$Minikin_SP1_1$datetime), 100)
+    expect_equal(length(data$localities$A$loggers$Minikin_QTi_1$datetime), 100)
+    expect_equal(length(data$localities$A$loggers$Minikin_TH2_1$datetime), 100)
+    expect_equal(names(data$localities$A$loggers$Minikin_SP1_1$sensors), c("SP1_SWP", "SP1_T"))
+    expect_equal(names(data$localities$A$loggers$Minikin_QTi_1$sensors), c("QTi_PPFD", "QTi_T"))
+    expect_equal(names(data$localities$A$loggers$Minikin_TH2_1$sensors), c("TH2_T", "TH2_RH"))
+    sp1_csv <- vroom::vroom("../data/EMSBrno/00_2025_11_05.csv", delim = ";", skip = 1,
+                            col_names = c("datetime", "swp", "t"), na = c("", "NA"),
+                            col_types = vroom::cols(
+                                datetime = vroom::col_datetime(),
+                                swp = vroom::col_double(),
+                                t = vroom::col_double()
+                            ),
+                            locale = vroom::locale(decimal_mark = ",", tz = "Etc/GMT-1"))
+    expect_true(all(data$localities$A$loggers$Minikin_SP1_1$datetime == lubridate::with_tz(sp1_csv$datetime, "UTC")))
+    data_swp_values <- data$localities$A$loggers$Minikin_SP1_1$sensors$SP1_SWP$values
+    expect_true(all(is.na(data_swp_values) == is.na(sp1_csv$swp)))
+    expect_true(all(dplyr::near(data_swp_values[!is.na(data_swp_values)],
+                                sp1_csv$swp[!is.na(sp1_csv$swp)], tol = 1e-6)))
+    expect_true(all(dplyr::near(data$localities$A$loggers$Minikin_SP1_1$sensors$SP1_T$values,
+                                sp1_csv$t, tol = 1e-6)))
+    qti_csv <- vroom::vroom("../data/EMSBrno/18_2025_11_03.csv", delim = ";", skip = 1,
+                            col_names = c("datetime", "ppfd", "t"), na = c("", "NA"),
+                            col_types = vroom::cols(
+                                datetime = vroom::col_datetime(),
+                                ppfd = vroom::col_double(),
+                                t = vroom::col_double()
+                            ),
+                            locale = vroom::locale(decimal_mark = ",", tz = "Etc/GMT-1"))
+    expect_true(all(data$localities$A$loggers$Minikin_QTi_1$datetime == lubridate::with_tz(qti_csv$datetime, "UTC")))
+    expect_true(all(dplyr::near(data$localities$A$loggers$Minikin_QTi_1$sensors$QTi_PPFD$values,
+                                qti_csv$ppfd, tol = 1e-3)))
+    expect_true(all(dplyr::near(data$localities$A$loggers$Minikin_QTi_1$sensors$Qti_T$values,
+                                qti_csv$t, tol = 1e-6)))
+    th2_csv <- vroom::vroom("../data/EMSBrno/B4_2025_12_15.csv", delim = ";", skip = 1,
+                            col_names = c("datetime", "t", "rh"), na = c("", "NA"),
+                            col_types = vroom::cols(
+                                datetime = vroom::col_datetime(),
+                                rh = vroom::col_double(),
+                                t = vroom::col_double()
+                            ),
+                            locale = vroom::locale(decimal_mark = ",", tz = "Etc/GMT-1"))
+    expect_true(all(data$localities$A$loggers$Minikin_TH2_1$datetime == lubridate::with_tz(th2_csv$datetime, "UTC")))
+    expect_true(all(dplyr::near(data$localities$A$loggers$Minikin_TH2_1$sensors$TH2_RH$values,
+                                th2_csv$rh, tol = 1e-2)))
+    expect_true(all(dplyr::near(data$localities$A$loggers$Minikin_TH2_1$sensors$TH2_T$values,
+                                th2_csv$t, tol = 1e-2)))
 })

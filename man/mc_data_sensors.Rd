@@ -5,14 +5,14 @@
 \alias{mc_data_sensors}
 \title{Sensors definition.}
 \format{
-An object of class \code{environment} of length 28.
+An object of class \code{environment} of length 36.
 }
 \usage{
 mc_data_sensors
 }
 \description{
 R object of class environment with the definitions of (micro)climatic sensors.
-see \linkS4class{mc_Sensor}. Similarly as in case of logger format definitions \linkS4class{mc_DataFormat} it is easy
+see \link[=mc_Sensor-class]{mc_Sensor}. Similarly as in case of logger format definitions \link[=mc_DataFormat-class]{mc_DataFormat} it is easy
 to add new, sensor here. There is also universal sensor \code{real} where you can store any real values.
 }
 \details{
@@ -31,13 +31,18 @@ Currently supported sensors:
 \item HOBO_extT - external temperature in HOBO U23-004 logger (°C)
 \item integer - universal sensor with integer values
 \item logical - universal sensor with logical values
-\item VWC - volumetric water content in soil (m3/m3)
 \item precipitation - (mm)
+\item QTi_PPFD - photosynthetic photon flux density in EMS Minikin QTi (µmol/m²/s)
+\item QTi_T - temperature in EMS Minikin QTi (°C)
 \item real - universal sensor with real values
 \item RH - relative humidity sensor (\%)
+\item TH2_T - temperature in EMS Minikin TH2 (°C)
+\item TH2_RH - relative humidity in EMS Minikin TH2 (\%)
 \item snow_bool - result of function \code{\link[=mc_calc_snow]{mc_calc_snow()}}
 \item snow_fresh - fresh snow height (cm)
 \item snow_total - total snow height (cm)
+\item SP1_SWP - soil water potential in EMS Minikin SP1 (-bar)
+\item SP1_T - temperature in EMS Minikin SP1 (°C)
 \item sun_shine - time of sun shine (hours)
 \item T_C - universal temperature sensor (°C)
 \item Thermo_T - temperature sensor in Tomst Thermologger (°C)
@@ -45,6 +50,7 @@ Currently supported sensors:
 \item TMS_T2 - surface temperature sensor in Tomst TMS (°C)
 \item TMS_T3 - air temperature sensor in Tomst TMS (°C)
 \item TMS_moist - soil moisture sensor in Tomst TMS (raw TMS units)
+\item VWC - volumetric water content in soil (m³/m³)
 \item wind - wind speed (m/s)
 }
 }
